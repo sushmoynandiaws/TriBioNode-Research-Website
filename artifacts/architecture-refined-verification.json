@@ -1,0 +1,48 @@
+{
+  "landscape": {
+    "codec_name": "h264",
+    "width": 3840,
+    "height": 2160,
+    "r_frame_rate": "30/1",
+    "duration": "44.000000",
+    "nb_read_frames": "1320",
+    "web_bytes": 7374065,
+    "spacing_frames_checked": 1320,
+    "spacing_issues": 0,
+    "ssim": 0.999611,
+    "sha256": "500c9072132bbac83579e287f8920622ce4b8eca0a71223bcf5827a20292019a"
+  },
+  "portrait": {
+    "codec_name": "h264",
+    "width": 1440,
+    "height": 2560,
+    "r_frame_rate": "30/1",
+    "duration": "44.000000",
+    "nb_read_frames": "1320",
+    "web_bytes": 6299372,
+    "spacing_frames_checked": 1320,
+    "spacing_issues": 0,
+    "ssim": 0.999263,
+    "sha256": "ad0cdcc234843c97913143a5b53e6348c0dc8a64f50a15d8317caa2ef0b0f036"
+  },
+  "checks": {
+    "build": "passed",
+    "browser_tests": 17,
+    "browser_result": "all passed",
+    "responsive_widths": [
+      320,
+      390,
+      720,
+      721,
+      768,
+      1024,
+      1440,
+      1920
+    ],
+    "scene_ownership": "passed",
+    "opaque_3d_meshes": "passed",
+    "caption_clearance": "passed",
+    "separate_component_clearance": "passed",
+    "render_source_sha256": "183580869d15ca7733abe95cf5ab824fd1ffce00e8588c5af7291e20966a3a96"
+  }
+}

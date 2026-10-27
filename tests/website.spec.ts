@@ -8,7 +8,7 @@ test('desktop, tablet, and mobile layouts preserve content without overflow', as
   page.on('pageerror', error => errors.push(error.message))
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
   await page.goto('/')
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Three views.')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('from molecule to solubility prediction')
   await expect(page.getByRole('table', { name: /Measured ESOL performance/ })).toBeVisible()
   for (const width of [1440, 1920, 1024, 768, 721, 720, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 })

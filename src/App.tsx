@@ -2,7 +2,7 @@ import { Component, lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { absoluteError, asset, fmt, heroMolecule, label, matchingRecords, research, resultExport } from './research'
 import type { Molecule } from './research'
-import TriFoldLogo from './TriFoldLogo'
+import ArchitectureFilm from './ArchitectureFilm'
 
 const ResultsCharts = lazy(() => import('./ResultsCharts'))
 const ConformerViewer = lazy(() => import('./ConformerViewer'))
@@ -130,6 +130,12 @@ function ResearchResources() {
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [logoPaused, setLogoPaused] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
+  useEffect(() => {
+    const preference = matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => { if (preference.matches) setLogoPaused(true) }
+    preference.addEventListener('change', update)
+    return () => preference.removeEventListener('change', update)
+  }, [])
   const [activeSection, setActiveSection] = useState('overview')
   const [scrolled, setScrolled] = useState(false)
   const menuButton = useRef<HTMLButtonElement>(null)
@@ -144,16 +150,13 @@ export default function App() {
     return () => { observer.disconnect(); window.removeEventListener('scroll', onScroll) }
   }, [])
   const [selectedMolecule, setSelectedMolecule] = useState(heroMolecule)
-  const fused = research.views[3]
-  const bestSingleRmse = Math.min(...research.views.slice(0, 3).map(v => v.metrics.RMSE))
-  const improvement = (1 - fused.metrics.RMSE / bestSingleRmse) * 100
   const links = [['overview', 'Overview'], ['explorer', 'Molecules'], ['results', 'Results'], ['architecture', 'Architecture'], ['research', 'Resources']]
   return <>
     <a className="skip-link" href="#main">Skip to main content</a>
     <header className={`site-header ${scrolled ? 'scrolled' : ''}`} onKeyDown={event => {
       if (event.key === 'Escape' && menuOpen) { setMenuOpen(false); menuButton.current?.focus() }
     }}><div className="wrap header-inner"><Logo paused={logoPaused} /><button ref={menuButton} className="menu-button" aria-expanded={menuOpen} aria-controls="main-navigation" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? 'Close menu' : 'Menu'}<span aria-hidden="true">{menuOpen ? '×' : '☰'}</span></button><nav id="main-navigation" aria-label="Main navigation" className={menuOpen ? 'is-open' : ''}>{links.map(([id, name]) => <a key={id} href={`#${id}`} aria-current={activeSection === id ? 'location' : undefined} onClick={() => setMenuOpen(false)}>{name}</a>)}</nav><a className="header-action" href="#explorer">Explore molecules <Arrow /></a></div></header>
-    <main id="main"><section id="overview" className="hero"><div className="wrap"><div className="hero-topline"><p className="eyebrow"><span className="connection-dot" />Multi-view molecular learning</p><span className="issue-label">An interactive research atlas</span></div><div className="hero-grid"><div className="hero-copy"><h1>Three views.<br />One molecular<br />perspective.</h1><p>From chemical sequences to connected structures and spatial relationships. Explore how TriBioNode brings molecular representations together to predict solubility.</p><div className="hero-actions"><a className="button primary" href="#explorer">Explore molecules <Arrow /></a><a className="button text-link" href="#results">View measured results <Arrow /></a></div><p className="hero-note"><span className="tiny-check" aria-hidden="true">✓</span>Real molecules. Saved predictions. Evidence you can inspect.</p></div><div className="hero-visual"><div className="molecule-orbit"><TriFoldLogo paused={logoPaused} setPaused={setLogoPaused} /><div className="orbit-label orbit-label-one"><i style={{ background: research.views[0].color }} />01 <span>Sequence</span></div><div className="orbit-label orbit-label-two"><i style={{ background: research.views[1].color }} />02 <span>Structure</span></div><div className="orbit-label orbit-label-three"><i style={{ background: research.views[2].color }} />03 <span>Geometry</span></div></div><div className="hero-specimen"><div><span className="mini-label">TriFold / TriBioNode</span><p>Three complementary views. One shared core.</p></div><a href="#architecture" aria-label="Explore the model architecture"><Arrow /></a></div></div></div><div className="hero-stat-row"><div><strong>{research.meta.sampleCount}</strong><span>Held-out ESOL molecules<small>Saved test observations</small></span></div><div><strong>3<span className="stat-plus">+1</span></strong><span>Views & fused prediction<small>Jointly trained heads</small></span></div><div><strong>{fmt(fused.metrics.RMSE, 4)}</strong><span>Fused test RMSE<small>log₁₀(mol/L) · lower is better</small></span></div><div><strong>{fmt(improvement, 1)}<span className="stat-plus">%</span></strong><span>Lower RMSE than View 3<small>Best view-specific head in this run</small></span></div></div></div></section>
+    <main id="main"><ArchitectureFilm paused={logoPaused} setPaused={setLogoPaused} />
       <MoleculeExplorer onSelected={setSelectedMolecule} />
       <section id="results" className="section results-section"><div className="wrap"><SectionHeading eyebrow="Measured performance" title="A clearer view of the results."><p>Every number below is recalculated from the same {research.meta.sampleCount} saved test observations. Compare the four prediction heads on equal terms.</p></SectionHeading><VisualBoundary><Suspense fallback={<div className="chart-loading" role="status">Loading measured result charts…</div>}><ResultsCharts /></Suspense></VisualBoundary><div className="results-caption"><span className="connection-dot" /><p>ESOL · log₁₀(mol/L) · Scaffold split reported by the training notebook. No confidence intervals or cross-dataset rankings are inferred from this run.</p></div></div></section>
       <Architecture molecule={selectedMolecule} />

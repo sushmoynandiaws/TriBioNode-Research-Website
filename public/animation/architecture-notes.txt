@@ -1,0 +1,15 @@
+TriBioNode architecture film — 44 seconds
+
+Created from procedural Three.js geometry and rendered to H.264 MP4 in landscape (3840x2160) and portrait (1440x2560). Each master is rendered frame by frame with WebCodecs: 1320 frames at 30 fps, exactly 44 seconds. Web MP4 delivery uses H.264 CRF 17 at the original dimensions; source masters remain frame-accurate. No upscaling is used.
+
+Premium revision: controlled lighting, darker molecular materials, consistent blue/teal/amber view colors, larger depth-independent labels, and non-overlapping scene fades. Motion stays within each chapter. Encoder views start in their own lanes, and fusion branches use separate side-by-side lanes in portrait as well as landscape. Both orientation compositions are rendered independently.
+
+The film follows the actual training-notebook forward pass: character-level sequence Transformer; atom graph plus BRICS motif hierarchy; fixed-RBF 3D distance features. All three embeddings feed dynamic view gating and cross-modal Transformer fusion independently. Their two outputs are concatenated before the 512->256->128->1 prediction MLP.
+
+Pairwise contrastive alignment is shown as a training objective, not an extra inference layer. The film does not present pretrained ChemBERTa, effective coordinate updates, calibrated uncertainty, or lipophilicity results as implemented evidence.
+
+The final result is the saved ESOL 044 example: predicted -4.4593534, observed -4.380 log10(mol/L). The displayed routing weights are from that saved example. Models, vectors and processing pulses illustrate the architecture; they are not recovered internal activations or measured inference timings. The conformer is for visualization, not original training geometry.
+
+Source storyboard and renderer: design/architecture-film/. Three.js 0.186.1 is MIT licensed. No audio or narration.
+
+Refinement: whole-frame fades preserve opaque 3D surfaces. Cross-chapter flying embeddings and the orbit around result text were removed. Labels and flow paths occupy separate zones. The renderer checks projected label bounds against labels, mesh bounds and sampled connector paths for all 1320 frames per orientation, including chapter boundaries; export stops on a collision, transparent 3D mesh, or an object outside chapter ownership. Token letters intentionally occupy their own token tiles. This is a conservative screen-space geometry check, supplemented by visual review.
