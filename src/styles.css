@@ -91,7 +91,10 @@ button svg, a svg { flex-shrink: 0; }
 .header-inner { position: relative; width: 100%; min-height: 72px; padding: 10px 22px; display: flex; align-items: center; justify-content: space-between; gap: 18px; border: 1px solid var(--nav-border); border-radius: var(--r-pill); background: var(--nav-bg); box-shadow: var(--sh-card), inset 0 1px 0 var(--surface); transition: box-shadow .25s var(--ease-out-quart); }
 .scrolled .header-inner { box-shadow: var(--sh-panel), inset 0 1px 0 var(--surface); }
 .brand { display: inline-flex; align-items: center; gap: 9px; flex-shrink: 0; }
-.brand svg { width: 28px; height: 32px; color: var(--text); }
+.brand-mark { display: block; width: 40px; height: 40px; overflow: hidden; flex-shrink: 0; }
+.brand-motion { display: block; width: 9600%; max-width: none; height: 100%; animation: trifold-gentle 6s steps(96, end) infinite; }
+.brand-still { display: block; width: 100%; height: 100%; }
+@keyframes trifold-gentle { to { transform: translateX(-100%); } }
 .brand > span { font-size: 21px; font-weight: 650; letter-spacing: -.045em; line-height: 1.1; }
 .brand-caption { display: block; font-size: 10px; font-weight: 400; letter-spacing: .01em; color: var(--text-2); margin-top: 5px; }
 .site-header .brand-caption { color: var(--text-body); }
@@ -117,12 +120,12 @@ button svg, a svg { flex-shrink: 0; }
 .tiny-check { color: var(--accent-link); }
 .hero-visual { min-width: 0; background: var(--surface); border-radius: var(--r-hero); padding: 18px 24px; box-shadow: var(--sh-panel); }
 .molecule-orbit { position: relative; height: 348px; display: grid; place-items: center; isolation: isolate; }
-.hero-structure { width: 100%; position: relative; z-index: 2; }
-.hero-structure img { width: 100%; height: auto; mix-blend-mode: multiply; }
-.orbit-ring { position: absolute; width: 302px; height: 302px; max-width: 94%; border: 1px solid var(--hairline); border-radius: 50%; }
-.orbit-two { width: 234px; height: 234px; border-style: dashed; }
-.orbit-dot { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--control-border); }
-.dot-one { top: 44px; right: 24%; }.dot-two { bottom: 46px; right: 26%; }.dot-three { top: 50%; left: 13%; }
+.trifold-animation { position: relative; width: 100%; height: 100%; }
+.trifold-media { position: absolute; inset: 0 0 32px; }
+.trifold-media img, .trifold-media video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.trifold-motion { position: absolute; right: 0; bottom: 0; display: inline-flex; align-items: center; gap: 7px; min-height: 44px; border: 0; border-radius: var(--r-pill); padding: 8px 12px; background: var(--surface); color: var(--accent-link); font: inherit; font-size: 11px; cursor: pointer; z-index: 4; }
+.trifold-motion:hover { background: var(--hover); }
+.trifold-motion span { width: 12px; font-size: 10px; }
 .orbit-label { position: absolute; z-index: 3; display: flex; align-items: center; gap: 7px; padding: 9px 12px; border-radius: var(--r-pill); border: 1px solid var(--glass-edge); background: var(--glass); -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%); color: var(--text-2); font-size: 11px; box-shadow: var(--sh-card); }
 .orbit-label span { color: var(--text-body); font-weight: 500; }
 .orbit-label i { width: 5px; height: 5px; border-radius: 50%; }
@@ -343,7 +346,7 @@ summary::-webkit-details-marker { display: none; }summary > span:last-child { tr
 }
 @media (max-width: 900px) {
   .hero-grid { gap: 28px; }.hero h1 { font-size: 52px; }.hero-copy > p:not(.hero-note) { font-size: 16px; }
-  .hero-visual { padding: 16px; }.molecule-orbit { height: 310px; }.orbit-ring { width: 260px; height: 260px; }.orbit-two { width: 204px; height: 204px; }.orbit-label { padding: 8px; font-size: 10px; }.orbit-label-two { left: 0; }.orbit-label-three { right: 0; }
+  .hero-visual { padding: 16px; }.molecule-orbit { height: 310px; }.orbit-label { padding: 8px; font-size: 10px; }.orbit-label-two { left: 0; }.orbit-label-three { right: 0; }
   .hero-stat-row > div { padding-inline: 20px; }.hero-stat-row strong { font-size: 31px; }
   .section-heading { grid-template-columns: 1fr; gap: 18px; }.section-heading h2 { max-width: 650px; }.section-intro p { max-width: 650px; }
   .molecule-stage { grid-template-columns: 1fr; }
@@ -361,7 +364,7 @@ summary::-webkit-details-marker { display: none; }summary > span:last-child { tr
 @media (max-width: 720px) {
   html { scroll-padding-top: 100px; }
   .site-header { top: 10px; width: calc(100% - 24px); margin-top: 10px; }.header-inner { min-height: 66px; padding: 8px 16px; }
-  .brand > span { font-size: 20px; }.brand-caption { font-size: 9px; }.brand svg { width: 26px; }
+  .brand > span { font-size: 20px; }.brand-caption { font-size: 9px; }.brand-mark { width: 36px; height: 36px; }
   .menu-button { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--nav-border); background: var(--nav-selected); border-radius: var(--r-pill); font-size: 14px; }.menu-button span { width: 15px; font-size: 17px; }
   .site-header nav { position: absolute; top: calc(100% + 10px); left: 0; width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 12px; border: 1px solid var(--nav-border); border-radius: var(--r-panel); background: var(--nav-bg); box-shadow: var(--sh-panel); transform-origin: top right; transform: translateY(-8px) scale(.98); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .25s var(--ease-spring), transform .25s var(--ease-spring), visibility .25s; }
   .site-header nav.is-open { transform: translateY(0) scale(1); opacity: 1; visibility: visible; pointer-events: auto; }
@@ -370,7 +373,7 @@ summary::-webkit-details-marker { display: none; }summary > span:last-child { tr
 @media (max-width: 680px) {
   .hero { padding-top: 32px; }.hero-topline .eyebrow { font-size: 12px; }.issue-label { display: none; }
   .hero-grid { grid-template-columns: 1fr; gap: 32px; padding-block: 30px 32px; }.hero h1 { font-size: clamp(44px, 10.8vw, 68px); letter-spacing: -.06em; margin-bottom: 20px; }.hero-copy > p:not(.hero-note) { font-size: 16px; max-width: 510px; margin-bottom: 22px; }.hero-actions { gap: 10px 20px; }.hero-note { margin-top: 18px; font-size: 11px; }
-  .hero-visual { padding: 16px 20px 20px; }.molecule-orbit { max-width: 440px; margin-inline: auto; height: 300px; }.orbit-ring { width: 268px; height: 268px; }.orbit-two { width: 206px; height: 206px; }.hero-structure { width: 100%; }.hero-structure img { max-height: 280px; object-fit: contain; }.orbit-label-one { top: 0; }.hero-specimen p { font-size: 11px; }
+  .hero-visual { padding: 16px 20px 20px; }.molecule-orbit { max-width: 440px; margin-inline: auto; height: 300px; }.orbit-label-one { top: 0; }.hero-specimen p { font-size: 11px; }
   .hero-stat-row { grid-template-columns: 1fr 1fr; row-gap: 24px; padding-block: 24px; }.hero-stat-row > div { padding-inline: 18px; }.hero-stat-row > div:nth-child(3) { border: 0; padding-left: 0; }.hero-stat-row strong { font-size: 32px; }.hero-stat-row > div > span { font-size: 12px; }.hero-stat-row small { font-size: 11px; }
   .section-heading { margin-bottom: 26px; }.section-heading h2 { font-size: clamp(30px, 7.8vw, 38px); }.section-intro p { font-size: 15px; }
   .explorer-top { flex-direction: column; align-items: flex-start; gap: 8px; }.explorer-top .subtle { text-align: left; max-width: none; }
