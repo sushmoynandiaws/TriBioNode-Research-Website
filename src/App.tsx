@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { absoluteError, asset, fmt, heroMolecule, label, matchingRecords, research, resultExport } from './research'
 import type { Molecule } from './research'
 import ArchitectureFilm from './ArchitectureFilm'
+import MolecularStructure2D from './MolecularStructure2D'
 
 const ResultsCharts = lazy(() => import('./ResultsCharts'))
 const ConformerViewer = lazy(() => import('./ConformerViewer'))
@@ -45,11 +46,13 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
   const [selectedId, setSelectedId] = useState(heroMolecule.id)
   const [dimension, setDimension] = useState<'2d' | '3d'>('2d')
   const [status, setStatus] = useState('')
+  const [replayCount, setReplayCount] = useState(0)
   const filtered = matchingRecords(query)
   const molecule = filtered.find(r => r.id === selectedId) ?? filtered[0]
   function choose(record: Molecule) {
     setSelectedId(record.id)
     setStatus('')
+    setReplayCount(c => c + 1)
     onSelected(record)
   }
   function example(id: string) {
@@ -93,7 +96,7 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
       <div className="explorer-detail" role="region" aria-label="Selected molecule results">
         {!molecule ? <div className="empty-state"><span aria-hidden="true">⌬</span><h3>Not present in this evaluation</h3><p>Search the {research.meta.sampleCount} saved ESOL molecules by SMILES or ID, or choose an example. This site does not run predictions for unseen molecules.</p><button className="button primary" onClick={reset}>Return to an example <Arrow /></button></div> : <>
           <div className="molecule-heading"><div><p className="mini-label">Test observation / {String(molecule.ordinal).padStart(3, '0')}</p><h3>{label(molecule)} <span>Delaney ESOL</span></h3></div><button className="button compact secondary" onClick={download} aria-label="Download selected molecule result">Export result <Arrow down /></button></div>
-          <div className="molecule-stage"><div className="structure-panel"><div className="structure-toolbar"><span className="mini-label">Molecular structure</span><div className="segmented" role="group" aria-label="Structure display"><button aria-pressed={dimension === '2d'} onClick={() => setDimension('2d')}>2D</button><button aria-pressed={dimension === '3d'} onClick={() => setDimension('3d')}>3D</button></div></div>{dimension === '2d' ? <img className="molecule-image" src={asset(molecule.structure)} alt={`RDKit 2D molecular structure of ${label(molecule)}`} width="560" height="340" /> : <VisualBoundary key={molecule.id}><Suspense fallback={<p className="viewer-loading" role="status">Loading conformer viewer…</p>}><ConformerViewer path={molecule.conformer} name={label(molecule)} /></Suspense></VisualBoundary>}<div className="structure-meta"><span>{molecule.atoms} heavy atoms</span><span>{molecule.rings} rings</span><span>{fmt(molecule.mass, 2)} g/mol</span></div></div><div className="observation-card"><p className="mini-label">Experimental log solubility</p><strong>{fmt(molecule.target)}</strong><span className="unit">log₁₀(mol/L)</span><div className="observed-divider" /><p className="mini-label">Fused prediction</p><span className="fused-value">{fmt(molecule.predictions.fused)}</span><span className="error-pill">Absolute error {fmt(absoluteError(molecule, 'fused'))}</span><p className="micro">One held-out observation from the saved test set.</p></div></div>
+          <div className="molecule-stage"><div className="structure-panel"><div className="structure-toolbar"><span className="mini-label">Molecular structure</span><div className="structure-actions"><button className="assemble-btn" onClick={() => setReplayCount(c => c + 1)} title="Replay molecular assembly animation" aria-label="Replay molecular assembly animation"><span aria-hidden="true">↺</span> Assemble</button><div className="segmented" role="group" aria-label="Structure display"><button aria-pressed={dimension === '2d'} onClick={() => setDimension('2d')}>2D</button><button aria-pressed={dimension === '3d'} onClick={() => setDimension('3d')}>3D</button></div></div></div>{dimension === '2d' ? <MolecularStructure2D key={molecule.id} structure={molecule.structure} name={label(molecule)} id={molecule.id} replayCount={replayCount} /> : <VisualBoundary key={`${molecule.id}-${replayCount}`}><Suspense fallback={<p className="viewer-loading" role="status">Loading conformer viewer…</p>}><ConformerViewer path={molecule.conformer} name={label(molecule)} /></Suspense></VisualBoundary>}<div className="structure-meta"><span>{molecule.atoms} heavy atoms</span><span>{molecule.rings} rings</span><span>{fmt(molecule.mass, 2)} g/mol</span></div></div><div className="observation-card"><p className="mini-label">Experimental log solubility</p><strong>{fmt(molecule.target)}</strong><span className="unit">log₁₀(mol/L)</span><div className="observed-divider" /><p className="mini-label">Fused prediction</p><span className="fused-value">{fmt(molecule.predictions.fused)}</span><span className="error-pill">Absolute error {fmt(absoluteError(molecule, 'fused'))}</span><p className="micro">One held-out observation from the saved test set.</p></div></div>
           <div className="smiles-box"><div className="small-heading"><span className="mini-label">Source SMILES</span><button onClick={copySmiles} className="text-button" aria-label="Copy SMILES">Copy SMILES <span aria-hidden="true">⧉</span></button></div><code>{molecule.smiles}</code></div>
           <div className="prediction-cards">{research.views.map(view => <div key={view.key} style={{ '--view-color': view.color } as CSSProperties}><p>{view.label}<span>{view.name}</span></p><strong>{fmt(molecule.predictions[view.key])}</strong><span className="micro">Abs. error {fmt(absoluteError(molecule, view.key))}</span></div>)}</div>
           <PredictionComparison molecule={molecule} />
