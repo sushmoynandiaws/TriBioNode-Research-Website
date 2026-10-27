@@ -3,11 +3,12 @@ import { asset } from './research'
 
 const chapters = ['Molecule input', 'Three representation encoders', 'Parallel gating and cross-modal fusion', 'Concatenation and prediction MLP', 'Saved solubility prediction']
 const times = [0, 6, 18, 29, 36]
+const portraitQuery = '(max-width: 640px) and (max-aspect-ratio: 1/1)'
 
 export default function ArchitectureFilm({ paused, setPaused }: { paused: boolean; setPaused: (value: boolean) => void }) {
   const video = useRef<HTMLVideoElement>(null)
   const resumeTime = useRef(0)
-  const [portrait, setPortrait] = useState(() => matchMedia('(max-aspect-ratio: 1/1)').matches)
+  const [portrait, setPortrait] = useState(() => matchMedia(portraitQuery).matches)
   const [time, setTime] = useState(0)
   const [duration, setDuration] = useState(44)
   const [failed, setFailed] = useState(false)
@@ -15,7 +16,7 @@ export default function ArchitectureFilm({ paused, setPaused }: { paused: boolea
   const chapter = times.reduce((active, start, i) => time >= start ? i : active, 0)
 
   useEffect(() => {
-    const media = matchMedia('(max-aspect-ratio: 1/1)')
+    const media = matchMedia(portraitQuery)
     const update = () => { resumeTime.current = video.current?.currentTime ?? 0; setPortrait(media.matches) }
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)

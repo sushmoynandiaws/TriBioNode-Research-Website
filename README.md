@@ -34,7 +34,7 @@ npm run preview
 
 The source is read-only:
 
-`E:\Ship Studio\Research TriBioNode\ADD_thesis`
+`/Users/nazmulhossain/Documents/ADD_thesis-main`
 
 To regenerate the snapshot, use Python 3.11+ with NumPy and RDKit. Their versions used for the prepared snapshot are recorded in `public/downloads/provenance.json` and pinned in `requirements-data.txt`.
 
@@ -96,4 +96,4 @@ For self-hosting, the optional `deploy/nginx.conf` shows MIME types, compression
 - `tests/website.spec.ts`: real-browser interaction, layout, and accessibility checks.
 
 The reference site informed the introduction → interactive exploration → results → explanation flow. The TriBioNode layout, copy, molecular assets, icons, favicon, and social preview were created for this project. No reference-site branding or images are shipped.
-"# TriBioNode-Research-Website" 
+"# TriBioNode-Research-Website"

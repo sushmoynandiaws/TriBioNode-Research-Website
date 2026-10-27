@@ -1,18 +1,57 @@
 import { expect, test } from '@playwright/test'
+import { writeFile } from 'node:fs/promises'
 
-test('overview is a full-viewport architecture video without text columns or cards', async ({ page }) => {
+test('overview keeps a full-width architecture video below the header without text columns or cards', async ({ page }) => {
   await page.goto('/')
   const video = page.locator('.architecture-video')
   await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).readyState)).toBeGreaterThan(1)
   const box = await video.boundingBox()
   expect(box!.width).toBe(page.viewportSize()!.width)
-  expect(box!.height).toBe(page.viewportSize()!.height)
-  expect(Math.abs(box!.y)).toBeLessThan(1)
+  const header = await page.locator('.site-header').boundingBox()
+  expect(box!.y - (header!.y + header!.height)).toBeCloseTo(12, 0)
+  expect(box!.height).toBeLessThanOrEqual(box!.width * 9 / 16 + 1)
   await expect(page.locator('.hero-copy, .hero-main, .hero-visual, .overview-evidence')).toHaveCount(0)
   expect(await video.evaluate(element => (element as HTMLVideoElement).duration)).toBeGreaterThan(43)
   expect(await video.evaluate(element => (element as HTMLVideoElement).duration)).toBeLessThan(45)
   expect(await video.evaluate(element => (element as HTMLVideoElement).muted)).toBe(true)
   expect(await video.evaluate(element => (element as HTMLVideoElement).videoWidth)).toBe(3840)
+})
+
+test('overview spacing stays balanced on phones, tablets, desktops and short screens', async ({ page }) => {
+  const report = []
+  for (const [width, height] of [[320, 740], [390, 844], [640, 960], [641, 960], [768, 1024], [1024, 768], [1440, 900], [1920, 1080], [844, 390]]) {
+    await page.setViewportSize({ width, height })
+    await page.goto('/')
+    const video = page.locator('.architecture-video')
+    const portrait = width <= 640 && width <= height
+    await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).videoWidth)).toBe(portrait ? 1440 : 3840)
+    const layout = await page.evaluate(() => {
+      const rect = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
+      const film = rect('#overview'), header = rect('.site-header'), video = rect('.architecture-video'), controls = rect('.film-controls'), next = rect('#explorer')
+      const media = document.querySelector('video')!
+      return { width: innerWidth, height: innerHeight, headerGap: video.top - header.bottom, controlGap: controls.top - video.bottom, bottomGap: film.bottom - controls.bottom, nextGap: next.top - film.bottom, videoWidth: video.width, videoHeight: video.height, nativeRatio: media.videoWidth / media.videoHeight, controlLeft: controls.left, controlRight: controls.right, controlsHeight: controls.height, filmBottom: film.bottom, fit: getComputedStyle(media).objectFit, overflow: document.documentElement.scrollWidth > innerWidth }
+    })
+    expect(layout.headerGap).toBeCloseTo(12, 0)
+    expect(layout.controlGap).toBeCloseTo(12, 0)
+    expect(layout.bottomGap).toBeGreaterThanOrEqual(24)
+    expect(layout.bottomGap).toBeLessThanOrEqual(48)
+    expect(Math.abs(layout.nextGap)).toBeLessThan(1)
+    expect(layout.videoWidth).toBe(width)
+    expect(layout.videoHeight).toBeLessThanOrEqual(width / layout.nativeRatio + 1)
+    expect(layout.controlLeft).toBeGreaterThanOrEqual(12)
+    expect(layout.controlRight).toBeLessThanOrEqual(width - 12)
+    expect(layout.controlsHeight).toBeGreaterThanOrEqual(44)
+    expect(layout.fit).toBe('contain')
+    expect(layout.overflow).toBe(false)
+    if (height > 560) expect(layout.filmBottom).toBeLessThanOrEqual(height + 1)
+    report.push(layout)
+    if (width === 390 || width === 768 || width === 1440) {
+      await page.getByRole('slider', { name: 'Architecture film progress' }).fill('14.5')
+      await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).seeking)).toBe(false)
+      await page.screenshot({ path: `artifacts/overview-spacing-${width}.png` })
+    }
+  }
+  await writeFile('artifacts/overview-spacing-verification.json', JSON.stringify(report, null, 2))
 })
 
 test('the complete film plays, pauses, seeks through every chapter and replays', async ({ page }) => {
@@ -57,6 +96,10 @@ test('portrait composition preserves progress when switching from landscape', as
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(video).toHaveAttribute('src', /architecture-refined-portrait.mp4$/)
   await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).videoHeight)).toBe(2560)
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).currentTime)).toBeCloseTo(23, 1)
+  await page.setViewportSize({ width: 768, height: 1024 })
+  await expect(video).toHaveAttribute('src', /architecture-refined-landscape.mp4$/)
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).videoWidth)).toBe(3840)
   await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).currentTime)).toBeCloseTo(23, 1)
 })
 
