@@ -24,7 +24,7 @@ export type View = {
   description: string
   metrics: Record<MetricKey, number>
 }
-export const research = raw as Omit<typeof raw, 'records' | 'views'> & { records: Molecule[]; views: View[] }
+export const research = { ...raw, views: raw.views.map(view => ({ ...view, color: `var(--${view.key})` })) } as Omit<typeof raw, 'records' | 'views'> & { records: Molecule[]; views: View[] }
 export const asset = (path: string) => `${import.meta.env.BASE_URL}${path}`
 export const fmt = (value: number, digits = 3) => value.toFixed(digits)
 export const label = (molecule: Molecule) => `ESOL ${String(molecule.ordinal).padStart(3, '0')}`

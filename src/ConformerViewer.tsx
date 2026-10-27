@@ -61,8 +61,8 @@ export default function ConformerViewer({ path, name }: { path: string | null; n
     {geometry.bonds.map((bond, i) => {
       const a = projected[bond.start]
       const b = projected[bond.end]
-      return <g key={i}><line x1={a.x} x2={b.x} y1={a.y} y2={b.y} stroke="#91a7ad" strokeWidth={bond.order > 1 ? 4 : 2.5} strokeLinecap="round" />{bond.order > 1 && <line x1={a.x} x2={b.x} y1={a.y} y2={b.y} stroke="#f8faf8" strokeWidth="1" />}</g>
+      return <g key={i}><line x1={a.x} x2={b.x} y1={a.y} y2={b.y} stroke="var(--control-border)" strokeWidth={bond.order > 1 ? 4 : 2.5} strokeLinecap="round" />{bond.order > 1 && <line x1={a.x} x2={b.x} y1={a.y} y2={b.y} stroke="var(--surface)" strokeWidth="1" />}</g>
     })}
-    {[...projected].sort((a, b) => a.depth - b.depth).map(a => <g key={a.index}><circle cx={a.x} cy={a.y} r={a.element === 'C' ? 7 : 10} fill={colors[a.element] ?? '#735c96'} stroke="white" strokeWidth="1.5" /><text x={a.x} y={a.y + 3} textAnchor="middle" fontSize={a.element.length > 1 ? '7' : '8'} fontWeight="700" fill="white">{a.element}</text></g>)}
+    {[...projected].sort((a, b) => a.depth - b.depth).map(a => <g key={a.index}><circle cx={a.x} cy={a.y} r={a.element === 'C' ? 7 : 10} fill={colors[a.element] ?? '#735c96'} stroke="var(--surface)" strokeWidth="1.5" /><text x={a.x} y={a.y + 3} textAnchor="middle" fontSize={a.element.length > 1 ? '7' : '8'} fontWeight="700" fill="var(--surface)">{a.element}</text></g>)}
   </svg><div className="conformer-controls"><span>Drag or use arrow keys to rotate</span><label>Zoom<input aria-label="3D conformer zoom" type="range" min="0.65" max="1.5" step="0.05" value={zoom} onChange={e => setZoom(Number(e.target.value))} /></label><button className="text-button" onClick={() => { setRotation([0.3, -0.4]); setZoom(1) }}>Reset view</button></div><p className="micro conformer-note">{geometry.method}. Fresh visualization conformer; not the original training geometry.</p></div>
 }

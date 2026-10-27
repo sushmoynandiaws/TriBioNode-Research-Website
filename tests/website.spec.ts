@@ -10,13 +10,22 @@ test('desktop, tablet, and mobile layouts preserve content without overflow', as
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Three views.')
   await expect(page.getByRole('table', { name: /Measured ESOL performance/ })).toBeVisible()
-  for (const width of [1440, 768, 390]) {
+  for (const width of [1440, 1920, 1024, 768, 721, 720, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 })
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    const smallControls = await page.locator('button, input, select').evaluateAll(nodes => nodes.filter(node => {
+      const box = node.getBoundingClientRect()
+      return box.width > 0 && box.height > 0 && getComputedStyle(node).visibility !== 'hidden' && box.height < 43.5
+    }).map(node => node.textContent || node.getAttribute('aria-label')))
+    expect(smallControls, `Controls need a 44px touch target at ${width}px`).toEqual([])
     if (width === 1440) await page.screenshot({ path: 'artifacts/preview-desktop.png' })
     const broken = await page.evaluate(() => Array.from(document.images).filter(image => !image.complete || image.naturalWidth === 0).map(image => image.src))
     expect(broken).toEqual([])
     await page.screenshot({ path: `artifacts/site-${width}.png`, fullPage: true })
+    if (width === 390) {
+      await page.getByRole('link', { name: 'Back to top' }).click()
+      await page.screenshot({ path: 'artifacts/preview-mobile.png' })
+    }
     if (width === 1440 || width === 390) {
       for (const section of ['explorer', 'results', 'architecture', 'research']) {
         await page.locator(`#${section}`).screenshot({ path: `artifacts/${section}-${width}.png`, style: '.site-header, .skip-link { visibility: hidden !important; }' })
@@ -142,10 +151,19 @@ test('mobile menu and keyboard navigation are usable', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused()
   const menu = page.getByRole('button', { name: 'Menu', exact: true })
   await menu.click()
+  await page.keyboard.press('Escape')
+  await expect(menu).toHaveAttribute('aria-expanded', 'false')
+  await expect(menu).toBeFocused()
+  await menu.click()
   await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
+  await expect(page.getByRole('navigation').getByRole('link')).toHaveText(['Overview', 'Molecules', 'Results', 'Architecture', 'Resources'])
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toHaveCSS('backdrop-filter', /blur\(18px\)/)
+  await page.screenshot({ path: 'artifacts/navbar-mobile.png' })
   await page.getByRole('navigation').getByRole('link', { name: 'Results', exact: true }).click()
   await expect(menu).toHaveAttribute('aria-expanded', 'false')
   await expect(page).toHaveURL(/#results$/)
+  await expect(page.locator('nav a[href="#results"]')).toHaveAttribute('aria-current', 'location')
+  await expect(page.locator('.site-header')).toHaveClass(/scrolled/)
 })
 
 test('visible desktop and mobile content passes automated WCAG accessibility checks', async ({ page }) => {
@@ -156,5 +174,10 @@ test('visible desktop and mobile content passes automated WCAG accessibility che
     const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()
     await writeFile(`artifacts/accessibility-${width}.json`, JSON.stringify({ violations: result.violations, incomplete: result.incomplete.map(v => ({ id: v.id, description: v.description })), passes: result.passes.map(v => v.id) }, null, 2))
     expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => ({ target: n.target, summary: n.failureSummary })) }))).toEqual([])
+    if (width === 390) {
+      await page.getByRole('button', { name: 'Menu', exact: true }).click()
+      const menuResult = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()
+      expect(menuResult.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.target) }))).toEqual([])
+    }
   }
 })
