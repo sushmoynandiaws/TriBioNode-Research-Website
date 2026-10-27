@@ -1,0 +1,77 @@
+{
+  "sourceRevision": "00078714be5f8b8b7bd2ce5d563ff881dfe3deee",
+  "sourceFiles": [
+    {
+      "path": "outputs/view1_predictions_and_metrics.csv",
+      "sha256": "583d2703889a4c4c8eca31a6bf04ed482764ccd0d9063a0564208367ea465aaa"
+    },
+    {
+      "path": "outputs/view2_predictions_and_metrics.csv",
+      "sha256": "a3cf3cd34fe549b41c5d3cd04409dc61a30b8657351bd9e4659fd13fa773d8cd"
+    },
+    {
+      "path": "outputs/view3_predictions_and_metrics.csv",
+      "sha256": "c5400bcdaf8ab4110836018938a9d30fd29462b1448fec899b0ccd2c6eaa0f80"
+    },
+    {
+      "path": "outputs/tribionode_fused_predictions.csv",
+      "sha256": "503d0e36e3fa535b09f684390ce46a2ca8fcb740933be593e348da3a9f4a006f"
+    },
+    {
+      "path": "outputs/views_evaluation_summary.csv",
+      "sha256": "5fe837691a0c556a2e9f65be2f77a82d4a6a62cf7b7cf889a70e1e387f737096"
+    },
+    {
+      "path": "outputs/multiview_embeddings.npz",
+      "sha256": "531f29b7250654b211194c79ed7e3aca2372907b3daa611365c2e07dc0347a10"
+    },
+    {
+      "path": "01_EDA_Comprehensive_Molecular_Benchmarks.ipynb",
+      "sha256": "cf56cc1a7368360afb820e9df5aeee648d1530e61f5eb1457a00e464e917670e"
+    },
+    {
+      "path": "02_Train_TriBioNode_MultiView_Architecture.ipynb",
+      "sha256": "752a49e858052480b8c530a4ebe91867ec8db98e04b92fe62fb1303e6fc4ab9f"
+    },
+    {
+      "path": "reports/TRIBIONODE_V2_PAPER_DRAFT.md",
+      "sha256": "d4769cfd8a50765dd50c212dbd7ecaa41d7b2d707df45b5bb8b2661fb657dd62"
+    }
+  ],
+  "method": "Strict row alignment; finite values; probability bounds and sums; recomputed metrics matched to source summary within 1e-5; NPZ alignment checks.",
+  "sampleCount": 113,
+  "catalogueCount": 16,
+  "rdkitVersion": "2026.03.5",
+  "numpyVersion": "2.3.5",
+  "split": "80/10/10 Bemis\u2013Murcko scaffold split as reported by the training notebook; original dataset not included, split not independently verified.",
+  "geometry": "Fresh deterministic RDKit ETKDGv3 visualization conformers, not recovered training coordinates.",
+  "embeddingShapes": {
+    "h_v1": [
+      113,
+      128
+    ],
+    "h_v2": [
+      113,
+      128
+    ],
+    "h_v3": [
+      113,
+      128
+    ],
+    "h_fused": [
+      113,
+      256
+    ],
+    "gate_weights": [
+      113,
+      3
+    ],
+    "targets": [
+      113,
+      1
+    ],
+    "smiles": [
+      113
+    ]
+  }
+}
