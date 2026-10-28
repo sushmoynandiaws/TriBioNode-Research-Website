@@ -48,12 +48,96 @@ function Gating({ molecule }: { molecule: Molecule }) {
   return <div className="gating"><div className="small-heading"><h4>View allocation</h4><span>Gating weights</span></div><div className="gate-track" role="img" aria-label={research.views.slice(0, 3).map((v, i) => `${v.label}: ${fmt(molecule.gates[i] * 100, 2)} percent`).join(', ')}>{research.views.slice(0, 3).map((view, i) => <span key={view.key} style={{ width: `${molecule.gates[i] * 100}%`, background: view.color }} />)}</div><div className="gate-labels">{research.views.slice(0, 3).map((view, i) => <span key={view.key}><i style={{ background: view.color }} />{view.label}<strong>{fmt(molecule.gates[i] * 100, 2)}%</strong></span>)}</div><p className="micro">Gating weights describe routing, not causal importance.</p></div>
 }
 
-function PredictionComparison({ molecule }: { molecule: Molecule }) {
-  const values = [molecule.target, ...research.views.map(v => molecule.predictions[v.key])]
+function PredictionComparison({
+  molecule,
+  predictions,
+  referenceValue,
+  referenceLabel,
+}: {
+  molecule?: Molecule
+  predictions?: { view1: number; view2: number; view3: number; fused: number }
+  referenceValue?: number
+  referenceLabel?: string
+}) {
+  const preds = predictions || molecule?.predictions
+  if (!preds) return null
+
+  const refVal = referenceValue !== undefined ? referenceValue : (molecule?.target ?? preds.fused)
+  const refLbl = referenceLabel || (molecule ? 'Observed' : 'Consensus')
+
+  const values = [refVal, preds.view1, preds.view2, preds.view3, preds.fused]
   const min = Math.floor(Math.min(...values)) - 0.5
   const max = Math.ceil(Math.max(...values)) + 0.5
-  const position = (value: number) => (130 + ((value - min) / (max - min)) * 405) / 6.4
-  return <div className="prediction-plot"><div className="small-heading"><h4>Prediction comparison</h4><span>log₁₀(mol/L)</span></div><div className="prediction-chart-scroll" role="region" tabIndex={0} aria-label="Prediction comparison chart; scroll horizontally to inspect"><svg viewBox="0 0 640 210" role="img" aria-label={`Predictions compared with experimental log solubility ${fmt(molecule.target)}. Dashed line marks the observation.`}><line x1={position(molecule.target) * 6.4} x2={position(molecule.target) * 6.4} y1="12" y2="169" stroke="var(--text-2)" strokeDasharray="4 4" /><text x={position(molecule.target) * 6.4} y="200" textAnchor="middle" fill="var(--text-2)" fontSize="14">Observed {fmt(molecule.target, 2)}</text>{research.views.map((view, i) => <g key={view.key}><text x="2" y={34 + i * 39} fill={view.color} fontSize="14" fontWeight="600">{view.label}</text><line x1="105" x2="572" y1={30 + i * 39} y2={30 + i * 39} stroke="var(--hairline)" /><line x1={position(molecule.target) * 6.4} x2={position(molecule.predictions[view.key]) * 6.4} y1={30 + i * 39} y2={30 + i * 39} stroke={view.color} strokeWidth="2" opacity="0.45" /><circle cx={position(molecule.predictions[view.key]) * 6.4} cy={30 + i * 39} r="6" fill={view.color}><title>{view.label}: {fmt(molecule.predictions[view.key])}</title></circle><text x="635" y={34 + i * 39} textAnchor="end" fill={view.color} fontSize="14" fontWeight="600">{fmt(molecule.predictions[view.key])}</text></g>)}</svg></div><p className="chart-scroll-hint">Scroll horizontally to inspect the chart.</p></div>
+  const span = max - min || 1
+  const position = (value: number) => (130 + ((value - min) / span) * 405) / 6.4
+
+  return (
+    <div className="prediction-plot">
+      <div className="small-heading">
+        <h4>Prediction comparison</h4>
+        <span>log₁₀(mol/L)</span>
+      </div>
+      <div
+        className="prediction-chart-scroll"
+        role="region"
+        tabIndex={0}
+        aria-label="Prediction comparison chart; scroll horizontally to inspect"
+      >
+        <svg
+          viewBox="0 0 640 210"
+          role="img"
+          aria-label={`Predictions compared with reference log solubility ${fmt(refVal)}. Dashed line marks ${refLbl.toLowerCase()}.`}
+        >
+          <line
+            x1={position(refVal) * 6.4}
+            x2={position(refVal) * 6.4}
+            y1="12"
+            y2="169"
+            stroke="var(--text-2)"
+            strokeDasharray="4 4"
+          />
+          <text
+            x={position(refVal) * 6.4}
+            y="200"
+            textAnchor="middle"
+            fill="var(--text-2)"
+            fontSize="14"
+          >
+            {refLbl} {fmt(refVal, 2)}
+          </text>
+          {research.views.map((view, i) => (
+            <g key={view.key}>
+              <text x="2" y={34 + i * 39} fill={view.color} fontSize="14" fontWeight="600">
+                {view.label}
+              </text>
+              <line x1="105" x2="572" y1={30 + i * 39} y2={30 + i * 39} stroke="var(--hairline)" />
+              <line
+                x1={position(refVal) * 6.4}
+                x2={position(preds[view.key]) * 6.4}
+                y1={30 + i * 39}
+                y2={30 + i * 39}
+                stroke={view.color}
+                strokeWidth="2"
+                opacity="0.45"
+              />
+              <circle
+                cx={position(preds[view.key]) * 6.4}
+                cy={30 + i * 39}
+                r="6"
+                fill={view.color}
+              >
+                <title>{view.label}: {fmt(preds[view.key])}</title>
+              </circle>
+              <text x="635" y={34 + i * 39} textAnchor="end" fill={view.color} fontSize="14" fontWeight="600">
+                {fmt(preds[view.key])}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+      <p className="chart-scroll-hint">Scroll horizontally to inspect the chart.</p>
+    </div>
+  )
 }
 
 function getUspSolubilityClass(logS: number): { label: string; classTag: string; color: string; bg: string } {
@@ -706,6 +790,21 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
                   </div>
                 ))}
               </div>
+
+              {(() => {
+                const esolMatch = research.records.find(
+                  r =>
+                    r.smiles.toLowerCase() === liveResult.smiles.toLowerCase() ||
+                    r.canonicalSmiles.toLowerCase() === liveResult.canonicalSmiles.toLowerCase()
+                )
+                return (
+                  <PredictionComparison
+                    predictions={liveResult.predictions}
+                    referenceValue={esolMatch ? esolMatch.target : liveResult.predictions.fused}
+                    referenceLabel={esolMatch ? 'Observed' : 'Consensus'}
+                  />
+                )
+              })()}
 
               <div className="gating">
                 <div className="small-heading"><h4>View allocation</h4><span>Gating weights</span></div>
