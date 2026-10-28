@@ -94,12 +94,157 @@ function getDominantView(gates?: number[]) {
   return { name: viewNames[maxIdx], percent: pct, index: maxIdx }
 }
 
+export interface MoleculeIdentity {
+  name: string
+  formula?: string
+  iupac?: string
+  isKnown: boolean
+}
+
+const COMMON_MOLECULES: Record<string, { name: string; formula?: string; iupac?: string }> = {
+  'CC(=O)Oc1ccccc1C(=O)O': {
+    name: 'Aspirin',
+    formula: 'C9H8O4',
+    iupac: '2-acetyloxybenzoic acid',
+  },
+  'CC(=O)Nc1ccc(O)cc1': {
+    name: 'Paracetamol (Acetaminophen)',
+    formula: 'C8H9NO2',
+    iupac: 'N-(4-hydroxyphenyl)acetamide',
+  },
+  'Cn1cnc2c1c(=O)n(c(=O)n2C)C': {
+    name: 'Caffeine',
+    formula: 'C8H10N4O2',
+    iupac: '1,3,7-trimethylpurine-2,6-dione',
+  },
+  'CC(C)Cc1ccc(cc1)C(C)C(=O)O': {
+    name: 'Ibuprofen',
+    formula: 'C13H18O2',
+    iupac: '2-[4-(2-methylpropyl)phenyl]propanoic acid',
+  },
+  'CC1(C(N2C(S1)C(C2=O)NC(=O)Cc3ccccc3)C(=O)O)C': {
+    name: 'Penicillin G',
+    formula: 'C16H18N2O4S',
+    iupac: '(2S,5R,6R)-3,3-dimethyl-7-oxo-6-[(2-phenylacetyl)amino]-4-thia-1-azabicyclo[3.2.0]heptane-2-carboxylic acid',
+  },
+  'CC(C)c1c(C(=O)Nc2ccccc2)c(c(-c3ccc(F)cc3)n1CC[C@@H](O)C[C@@H](O)CC(=O)O)-c4ccccc4': {
+    name: 'Atorvastatin',
+    formula: 'C33H35FN2O5',
+    iupac: '(3R,5R)-7-[2-(4-fluorophenyl)-3-phenyl-4-(phenylcarbamoyl)-5-propan-2-ylpyrrol-1-yl]-3,5-dihydroxyheptanoic acid',
+  },
+  'CN(C)C(=N)NC(=N)N': {
+    name: 'Metformin',
+    formula: 'C4H11N5',
+    iupac: '3-(diaminomethylidene)-1,1-dimethylguanidine',
+  },
+  'CN1CCC23C4C1CC5=C2C(=C(C=C5)O)OC3C(C=C4)O': {
+    name: 'Morphine',
+    formula: 'C17H19NO3',
+    iupac: '(4R,4aR,7S,7aR,12bS)-3-methyl-2,4,4a,7,7a,13-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol',
+  },
+  'CC(=O)CC(c1ccccc1)c2c(O)c3ccccc3oc2=O': {
+    name: 'Warfarin',
+    formula: 'C19H16O4',
+    iupac: '4-hydroxy-3-(3-oxo-1-phenylbutyl)chromen-2-one',
+  },
+  'COc1ccc2[nH]c(S(=O)Cc3ncc(C)c(OC)c3C)nc2c1': {
+    name: 'Omeprazole',
+    formula: 'C17H19N3O3S',
+    iupac: '6-methoxy-2-[(4-methoxy-3,5-dimethylpyridin-2-yl)methylsulfinyl]-1H-benzimidazole',
+  },
+  'CC1(C(N2C(S1)C(C2=O)NC(=O)C(c3ccc(O)cc3)N)C(=O)O)C': {
+    name: 'Amoxicillin',
+    formula: 'C16H19N3O5S',
+    iupac: '(2S,5R,6R)-6-[[(2R)-2-amino-2-(4-hydroxyphenyl)acetyl]amino]-3,3-dimethyl-7-oxo-4-thia-1-azabicyclo[3.2.0]heptane-2-carboxylic acid',
+  },
+  'CN1CCCC1c2cccnc2': {
+    name: 'Nicotine',
+    formula: 'C10H14N2',
+    iupac: '3-[(2S)-1-methylpyrrolidin-2-yl]pyridine',
+  },
+  'c1ccccc1': {
+    name: 'Benzene',
+    formula: 'C6H6',
+    iupac: 'benzene',
+  },
+  'CCO': {
+    name: 'Ethanol',
+    formula: 'C2H6O',
+    iupac: 'ethanol',
+  },
+}
+
+const pubchemCache = new Map<string, MoleculeIdentity>()
+
+async function resolveMoleculeIdentity(
+  smiles: string,
+  preferredName?: string,
+  canonicalSmiles?: string
+): Promise<MoleculeIdentity> {
+  const clean = smiles.trim()
+  if (!clean) {
+    return { name: 'Custom Molecule', isKnown: false }
+  }
+
+  // 1. Check local dictionary
+  if (COMMON_MOLECULES[clean]) {
+    const entry = COMMON_MOLECULES[clean]
+    return { name: entry.name, formula: entry.formula, iupac: entry.iupac, isKnown: true }
+  }
+  if (canonicalSmiles && COMMON_MOLECULES[canonicalSmiles]) {
+    const entry = COMMON_MOLECULES[canonicalSmiles]
+    return { name: entry.name, formula: entry.formula, iupac: entry.iupac, isKnown: true }
+  }
+
+  // 2. Check in-memory cache
+  if (pubchemCache.has(clean)) {
+    return pubchemCache.get(clean)!
+  }
+
+  const fallback: MoleculeIdentity = {
+    name: preferredName || 'Custom Molecule',
+    isKnown: Boolean(preferredName && preferredName !== 'Custom Molecule'),
+  }
+
+  // 3. Query PubChem PUG REST API
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 3500)
+    const encoded = encodeURIComponent(clean)
+    const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encoded}/property/Title,IUPACName,MolecularFormula/JSON`
+
+    const resp = await fetch(url, { signal: controller.signal })
+    clearTimeout(timer)
+
+    if (resp.ok) {
+      const data = await resp.json()
+      const props = data?.PropertyTable?.Properties?.[0]
+      if (props) {
+        const resolved: MoleculeIdentity = {
+          name: props.Title || preferredName || 'Custom Molecule',
+          formula: props.MolecularFormula,
+          iupac: props.IUPACName,
+          isKnown: Boolean(props.Title),
+        }
+        pubchemCache.set(clean, resolved)
+        if (canonicalSmiles) pubchemCache.set(canonicalSmiles, resolved)
+        return resolved
+      }
+    }
+  } catch {
+    // Graceful fallback on network timeout or offline
+  }
+
+  return fallback
+}
+
 const quickSamples = [
   { name: 'Aspirin', smiles: 'CC(=O)Oc1ccccc1C(=O)O' },
   { name: 'Paracetamol', smiles: 'CC(=O)Nc1ccc(O)cc1' },
   { name: 'Caffeine', smiles: 'Cn1cnc2c1c(=O)n(c(=O)n2C)C' },
   { name: 'Ibuprofen', smiles: 'CC(C)Cc1ccc(cc1)C(C)C(=O)O' },
   { name: 'Penicillin G', smiles: 'CC1(C(N2C(S1)C(C2=O)NC(=O)Cc3ccccc3)C(=O)O)C' },
+  { name: 'Atorvastatin', smiles: 'CC(C)c1c(C(=O)Nc2ccccc2)c(c(-c3ccc(F)cc3)n1CC[C@@H](O)C[C@@H](O)CC(=O)O)-c4ccccc4' },
 ]
 
 function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => void }) {
@@ -116,6 +261,12 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
   const [liveError, setLiveError] = useState<string | null>(null)
   const [liveResult, setLiveResult] = useState<LivePredictionResult | null>(null)
   const [backendHealth, setBackendHealth] = useState<BackendHealth | null>(null)
+  const [liveIdentity, setLiveIdentity] = useState<MoleculeIdentity>({
+    name: 'Aspirin',
+    formula: 'C9H8O4',
+    iupac: '2-acetyloxybenzoic acid',
+    isKnown: true,
+  })
 
   useEffect(() => {
     checkBackendHealth().then(setBackendHealth)
@@ -166,15 +317,32 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
     choose(heroMolecule)
   }
 
-  async function runLiveInference(smilesInput?: string) {
+  async function runLiveInference(smilesInput?: string, sampleName?: string) {
     const smilesToUse = (smilesInput || liveSmiles).trim()
     if (!smilesToUse) return
     setLiveLoading(true)
     setLiveError(null)
     setStatus('Running multi-view model inference...')
+
+    // Immediately reflect known name or clicked sample name
+    const immediate = COMMON_MOLECULES[smilesToUse]
+      ? { ...COMMON_MOLECULES[smilesToUse], isKnown: true }
+      : { name: sampleName || 'Custom Molecule', isKnown: Boolean(sampleName && sampleName !== 'Custom Molecule') }
+    setLiveIdentity(immediate)
+
     try {
-      const res = await predictSmiles(smilesToUse)
+      const [res, resolvedId] = await Promise.all([
+        predictSmiles(smilesToUse),
+        resolveMoleculeIdentity(smilesToUse, sampleName)
+      ])
       setLiveResult(res)
+
+      let finalIdentity = resolvedId
+      if (!finalIdentity.isKnown && res.canonicalSmiles) {
+        finalIdentity = await resolveMoleculeIdentity(res.canonicalSmiles, sampleName, res.canonicalSmiles)
+      }
+      setLiveIdentity(finalIdentity)
+
       const liveMolecule: Molecule = {
         id: `live-${Date.now()}`,
         ordinal: 0,
@@ -221,7 +389,7 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
           aria-pressed={tab === 'live'}
           onClick={() => {
             setTab('live')
-            if (!liveResult && !liveLoading) void runLiveInference()
+            if (!liveResult && !liveLoading) void runLiveInference(undefined, 'Aspirin')
           }}
         >
           <Icon name="sparkles" size={16} /> Live AWS Model Inference
@@ -372,7 +540,7 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
                   className="live-sample-chip"
                   onClick={() => {
                     setLiveSmiles(sample.smiles)
-                    void runLiveInference(sample.smiles)
+                    void runLiveInference(sample.smiles, sample.name)
                   }}
                 >
                   {sample.name}
@@ -380,7 +548,7 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
               ))}
             </div>
           </div>
-          <button className="reset-button" onClick={() => { setLiveSmiles('CC(=O)Oc1ccccc1C(=O)O'); void runLiveInference('CC(=O)Oc1ccccc1C(=O)O') }}>
+          <button className="reset-button" onClick={() => { setLiveSmiles('CC(=O)Oc1ccccc1C(=O)O'); void runLiveInference('CC(=O)Oc1ccccc1C(=O)O', 'Aspirin') }}>
             <Icon name="replay" /> Reset to Aspirin
           </button>
         </aside>
@@ -404,7 +572,11 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
               <div className="molecule-heading">
                 <div>
                   <p className="mini-label">Live Inference Observation</p>
-                  <h3>Custom Molecule <span>Predicted log₁₀(S)</span></h3>
+                  <h3>
+                    {liveIdentity.name}{' '}
+                    {liveIdentity.formula && <span className="formula-tag">{liveIdentity.formula}</span>}{' '}
+                    <span>Predicted log₁₀(S)</span>
+                  </h3>
                 </div>
                 <button
                   className="button compact secondary"
@@ -447,13 +619,13 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
                     <MolecularStructure2D
                       key={liveResult.canonicalSmiles}
                       structure={liveResult.structureSvg}
-                      name="Custom Molecule"
+                      name={liveIdentity.name}
                       id="custom-live"
                     />
                   ) : dimension === '3d' && liveResult.conformer ? (
                     <VisualBoundary key={`live-conformer-${liveResult.canonicalSmiles}`}>
                       <Suspense fallback={<p className="viewer-loading" role="status">Loading conformer viewer…</p>}>
-                        <ConformerViewer directGeometry={liveResult.conformer as Geometry} name="Custom Molecule" />
+                        <ConformerViewer directGeometry={liveResult.conformer as Geometry} name={liveIdentity.name} />
                       </Suspense>
                     </VisualBoundary>
                   ) : (
@@ -498,12 +670,29 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
 
               <div className="smiles-box">
                 <div className="small-heading">
-                  <span className="mini-label">Input SMILES</span>
+                  <span className="mini-label">Input Molecule</span>
                   <button onClick={() => copySmiles(liveResult.smiles)} className="text-button" aria-label="Copy SMILES">
                     Copy SMILES <Icon name="copy" />
                   </button>
                 </div>
-                <code>{liveResult.smiles}</code>
+
+                <div className="molecule-title-wrap">
+                  <div className="resolved-molecule-name">
+                    <strong>{liveIdentity.name}</strong>
+                    {liveIdentity.formula && <span className="formula-tag">{liveIdentity.formula}</span>}
+                    {liveIdentity.isKnown && <span className="verified-pill">Identified</span>}
+                  </div>
+                  {liveIdentity.iupac && (
+                    <p className="molecule-iupac-desc">
+                      <span className="iupac-label">IUPAC:</span> {liveIdentity.iupac}
+                    </p>
+                  )}
+                </div>
+
+                <div className="smiles-code-wrap">
+                  <span className="smiles-code-label">SMILES String</span>
+                  <code>{liveResult.smiles}</code>
+                </div>
               </div>
 
               <div className="prediction-cards">
