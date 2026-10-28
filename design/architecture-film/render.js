@@ -3,7 +3,7 @@ const canvas=document.querySelector('canvas'),status=document.getElementById('st
 const geometry=await fetch('/conformers/esol-044.json').then(r=>r.json()),data=await fetch('/src/research-data.json').then(r=>r.json());const molecule=data.records.find(r=>r.id==='esol-044');
 let film,time=0,playing=false,recording=false,start=0;
 function save(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-function build(){if(film){film.renderer.setAnimationLoop(null);film.dispose();}const portrait=format.value==='portrait';film=createFilm(canvas,geometry,molecule,portrait?1440:3840,portrait?2560:2160);time=0;playing=false;slider.value='0';output.textContent='0.00 s';play.textContent='Play preview';film.render(0);film.renderer.setAnimationLoop(frame);status.textContent='Ready · five chapters · 44 seconds · actual saved ESOL example';}
+function build(){if(film){film.renderer.setAnimationLoop(null);film.dispose();}const portrait=format.value==='portrait';film=createFilm(canvas,geometry,molecule,portrait?1440:3840,portrait?2560:2160);time=0;playing=false;slider.value='0';output.textContent='0.00 s';play.textContent='Play preview';film.render(0);film.renderer.setAnimationLoop(frame);status.textContent=`Ready · five chapters · ${DURATION} seconds · actual saved ESOL example`;}
 function frame(now){if(!playing)return;time=(now-start)/1000;if(time>=DURATION){if(recording){film.render(DURATION-.001);return;}time=0;start=now;}film.render(time);slider.value=String(time);output.textContent=time.toFixed(2)+' s';}
 format.addEventListener('change',build);
 play.addEventListener('click',()=>{playing=!playing;start=performance.now()-time*1000;play.textContent=playing?'Pause preview':'Play preview';});
@@ -15,8 +15,8 @@ record.addEventListener('click',()=>{
  const stream=canvas.captureStream(30),recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:40000000}),chunks=[];
  document.querySelectorAll('button,select,input').forEach(e=>e.disabled=true);recording=true;time=0;film.render(0);start=performance.now();playing=true;
  recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
- recorder.onstop=()=>{recording=false;playing=false;stream.getTracks().forEach(t=>t.stop());document.querySelectorAll('button,select,input').forEach(e=>e.disabled=false);save(new Blob(chunks,{type:mime}),`tribionode-architecture-${format.value}.webm`);status.textContent='Film captured · '+format.value+' · 44 seconds';};
- recorder.start();status.textContent='Recording the complete 44-second architecture story…';setTimeout(()=>recorder.stop(),DURATION*1000+100);
+ recorder.onstop=()=>{recording=false;playing=false;stream.getTracks().forEach(t=>t.stop());document.querySelectorAll('button,select,input').forEach(e=>e.disabled=false);save(new Blob(chunks,{type:mime}),`tribionode-architecture-${format.value}.webm`);status.textContent='Film captured · '+format.value+` · ${DURATION} seconds`;};
+ recorder.start();status.textContent=`Recording the complete ${DURATION}-second architecture story…`;setTimeout(()=>recorder.stop(),DURATION*1000+100);
 });
 build();[play,record,poster,hq].forEach(b=>b.disabled=false);
 

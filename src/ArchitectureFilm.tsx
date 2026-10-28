@@ -12,7 +12,7 @@ export default function ArchitectureFilm({ paused, setPaused }: { paused: boolea
   const resumeAfterScrub = useRef(false)
   const [portrait, setPortrait] = useState(() => matchMedia(portraitQuery).matches)
   const [time, setTime] = useState(0)
-  const [duration, setDuration] = useState(44)
+  const [duration, setDuration] = useState(40)
   const [failed, setFailed] = useState(false)
   const mode = portrait ? 'portrait' : 'landscape'
   const chapter = times.reduce((active, start, i) => time >= start ? i : active, 0)
@@ -60,7 +60,7 @@ export default function ArchitectureFilm({ paused, setPaused }: { paused: boolea
 
   return <section id="overview" className="architecture-film" aria-label="TriBioNode architecture film">
     <h1 className="sr-only">TriBioNode: from molecule to solubility prediction</h1>
-    <video key={mode} ref={video} className="architecture-video" src={asset(`animation/architecture-refined-${mode}.mp4`)} poster={asset(`animation/architecture-refined-${mode}-poster.png`)} muted playsInline preload="metadata" aria-label="44-second 3D film: molecule input, three encoders, parallel fusion, prediction MLP, and a saved ESOL solubility prediction" aria-describedby="architecture-film-description" onLoadedMetadata={event => {
+    <video key={mode} ref={video} className="architecture-video" src={asset(`animation/architecture-refined-${mode}.mp4`)} poster={asset(`animation/architecture-refined-${mode}-poster.png`)} muted playsInline preload="metadata" aria-label="40-second 3D film: molecule input, three encoders, parallel fusion, prediction MLP, and a saved ESOL solubility prediction" aria-describedby="architecture-film-description" onLoadedMetadata={event => {
       const element = event.currentTarget
       setDuration(element.duration)
       element.currentTime = Math.min(resumeTime.current, element.duration - .05)

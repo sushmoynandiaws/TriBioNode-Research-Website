@@ -31,7 +31,7 @@ test.describe('Molecular structure motion & thick connected bonds', () => {
     await expect(canvas).toHaveClass(/is-assembling/)
 
     // Screenshot 2D assembled molecule
-    await page.waitForTimeout(600)
+    await expect(canvas).not.toHaveClass(/is-assembling/)
     await page.locator('.structure-panel').screenshot({ path: 'artifacts/molecular-2d-structure.png' })
   })
 
@@ -79,21 +79,88 @@ test.describe('Molecular structure motion & thick connected bonds', () => {
     await expect(canvas.locator('.molecule-bond').first()).toBeVisible()
     await expect(canvas).not.toHaveClass(/is-assembling/)
     await page.getByRole('button', { name: 'Replay molecular assembly animation' }).click()
-    const timings = await canvas.evaluate(element => {
-      const animationEnd = (node: Element) => {
-        const style = getComputedStyle(node)
-        return (parseFloat(style.animationDuration) + parseFloat(style.animationDelay)) * 1000
-      }
-      return { entrance: animationEnd(element.querySelector('svg')!), latestPart: Math.max(...[...element.querySelectorAll('.molecule-bond, .molecule-atom')].map(animationEnd)) }
-    })
-    expect(timings.latestPart).toBeLessThanOrEqual(timings.entrance)
-    expect(timings.entrance).toBeLessThan(300)
+    const timings = await canvas.evaluate(element => element.getAnimations({ subtree: true }).map(animation => Number(animation.effect!.getComputedTiming().endTime)))
+    expect(Math.max(...timings)).toBe(1120)
+    await page.waitForTimeout(220)
+    const progress = await canvas.locator('.molecule-bond').evaluateAll(paths => paths.map(path => ({ opacity: Number(getComputedStyle(path).opacity), offset: parseFloat(getComputedStyle(path).strokeDashoffset) })))
+    expect(progress.some(path => path.opacity > .05)).toBe(true)
+    expect(progress.some(path => path.opacity < .95)).toBe(true)
+    expect(progress.some(path => path.offset > .05 && path.offset < .95)).toBe(true)
+    await page.locator('.structure-panel').screenshot({ path: 'artifacts/2d-assembly-in-progress.png' })
     await expect(canvas).not.toHaveClass(/is-assembling/)
     await expect(canvas.locator('.molecule-bond').last()).toHaveCSS('opacity', '1')
+    await expect(canvas.locator('.molecule-bond').last()).toHaveCSS('stroke-dashoffset', '0px')
     await page.getByRole('button', { name: 'Replay molecular assembly animation' }).click()
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await expect(canvas).not.toHaveClass(/is-assembling/)
     await page.getByRole('button', { name: 'Replay molecular assembly animation' }).click()
+    await expect(canvas).toHaveClass(/is-assembling/)
+    const gentle = await canvas.evaluate(element => element.getAnimations({ subtree: true }).every(animation => (animation.effect as KeyframeEffect).getKeyframes().every(frame => !('transform' in frame) && !('strokeDashoffset' in frame))))
+    expect(gentle).toBe(true)
+    await expect(canvas).not.toHaveClass(/is-assembling/)
+  })
+
+  test('2D assembly starts when first visible, replays on molecule selection and cancels old runs', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await page.goto('/')
+    const canvas = page.locator('.molecule-2d-canvas')
+    await expect(canvas.locator('.molecule-bond').first()).toBeAttached()
+    await expect(canvas).toHaveAttribute('data-assembly-pending', 'true')
+    await page.getByRole('navigation').getByRole('link', { name: 'Molecules', exact: true }).click()
+    await expect(canvas).toHaveClass(/is-assembling/)
+    await expect(canvas).not.toHaveClass(/is-assembling/)
+    await page.getByRole('button', { name: /^ESOL 077 / }).click()
+    await expect(canvas).toHaveClass(/is-assembling/)
+    await page.getByRole('button', { name: /^ESOL 044 / }).click()
+    await expect(canvas).toHaveClass(/is-assembling/)
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Replay molecular assembly animation' }).click()
+    await expect(canvas).toHaveClass(/is-assembling/)
+    await expect(canvas).not.toHaveClass(/is-assembling/)
+    expect(await canvas.evaluate(element => element.getAnimations({ subtree: true }).length)).toBe(0)
+    await page.getByRole('navigation').getByRole('link', { name: 'Overview', exact: true }).click()
+    await page.getByRole('navigation').getByRole('link', { name: 'Molecules', exact: true }).click()
+    await expect(canvas).not.toHaveClass(/is-assembling/)
+  })
+
+  test('2D assembly stays within mobile and desktop bounds throughout its timeline', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    for (const width of [320, 390, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/#explorer')
+      const canvas = page.locator('.molecule-2d-canvas')
+      await expect(canvas.locator('.molecule-bond').first()).toBeVisible()
+      await expect(canvas).not.toHaveClass(/is-assembling/)
+      await page.getByRole('button', { name: 'Replay molecular assembly animation' }).click()
+      const animations = await canvas.evaluateHandle(element => element.getAnimations({ subtree: true }))
+      await animations.evaluate(items => items.forEach(animation => animation.pause()))
+      for (let time = 0; time <= 1200; time += 100) {
+        await animations.evaluate((items, time) => items.forEach(animation => { animation.currentTime = time }), time)
+        const outside = await canvas.evaluate(element => {
+          const box = element.getBoundingClientRect()
+          return [...element.querySelectorAll('.molecule-bond, .molecule-atom')].filter(path => {
+            const part = path.getBoundingClientRect()
+            return part.left < box.left || part.right > box.right || part.top < box.top || part.bottom > box.bottom
+          }).length
+        })
+        expect(outside).toBe(0)
+        if (width === 1440) await canvas.screenshot({ path: `artifacts/2d-assembly-frame-${String(time).padStart(4, '0')}.png` })
+        else if (time === 400) await page.locator('.structure-panel').screenshot({ path: `artifacts/2d-assembly-${width}.png` })
+      }
+      await animations.evaluate(items => items.forEach(animation => animation.finish()))
+      await expect(canvas).not.toHaveClass(/is-assembling/)
+      await animations.dispose()
+    }
+  })
+
+  test('2D replay retries a failed SVG request and restores assembly', async ({ page }) => {
+    await page.route('**/molecules/esol-044.svg', route => route.fulfill({ status: 503, body: '' }))
+    await page.goto('/#explorer')
+    await expect(page.locator('.molecule-image')).toBeAttached()
+    await page.unroute('**/molecules/esol-044.svg')
+    await page.getByRole('button', { name: 'Replay molecular assembly animation' }).click()
+    const canvas = page.locator('.molecule-2d-canvas')
+    await expect(canvas.locator('.molecule-bond').first()).toBeVisible()
+    await expect(canvas).toHaveClass(/is-assembling/)
     await expect(canvas).not.toHaveClass(/is-assembling/)
   })
 

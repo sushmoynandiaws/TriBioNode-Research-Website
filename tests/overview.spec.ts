@@ -11,8 +11,7 @@ test('overview keeps a full-width architecture video below the header without te
   expect(box!.y - (header!.y + header!.height)).toBeCloseTo(12, 0)
   expect(box!.height).toBeLessThanOrEqual(box!.width * 9 / 16 + 1)
   await expect(page.locator('.hero-copy, .hero-main, .hero-visual, .overview-evidence')).toHaveCount(0)
-  expect(await video.evaluate(element => (element as HTMLVideoElement).duration)).toBeGreaterThan(43)
-  expect(await video.evaluate(element => (element as HTMLVideoElement).duration)).toBeLessThan(45)
+  expect(await video.evaluate(element => (element as HTMLVideoElement).duration)).toBeCloseTo(40, 2)
   expect(await video.evaluate(element => (element as HTMLVideoElement).muted)).toBe(true)
   expect(await video.evaluate(element => (element as HTMLVideoElement).videoWidth)).toBe(3840)
 })
@@ -145,7 +144,7 @@ test('film scrubbing preserves play intent and the final prediction stays on scr
   await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).paused)).toBe(true)
   await page.mouse.up()
   await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).paused)).toBe(false)
-  await progress.fill('43.5')
+  await progress.fill('39.5')
   await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).ended)).toBe(true)
   await expect(page.getByRole('button', { name: 'Play animation', exact: true })).toBeVisible()
   await expect(page.locator('#overview [role="status"]')).toContainText('Saved solubility prediction')
@@ -172,4 +171,88 @@ test('a seek requested during loading is preserved when the film becomes ready',
   const video = page.locator('.architecture-video')
   await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).readyState)).toBeGreaterThan(1)
   await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).currentTime)).toBeCloseTo(23, 1)
+})
+
+test('delivered optical highlight stays continuous through four seconds', async ({ page }) => {
+  await page.goto('/')
+  const video = page.locator('.architecture-video')
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).readyState)).toBeGreaterThan(1)
+  const highlights = []
+  for (const time of [3.9, 4.1]) {
+    await page.getByRole('slider', { name: 'Architecture film progress' }).fill(String(time))
+    await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).seeking)).toBe(false)
+    const highlight = await video.evaluate(element => {
+      const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360
+      const context = canvas.getContext('2d')!
+      context.drawImage(element as HTMLVideoElement, 0, 0, 640, 360)
+      const pixels = context.getImageData(0, 0, 640, 360).data
+      let count = 0, yTotal = 0
+      for (let y = 0; y < 360; y++) for (let x = 0; x < 640; x++) {
+        const radius = Math.hypot(x - 320, y - 186), offset = (y * 640 + x) * 4
+        const [r, g, b] = pixels.slice(offset, offset + 3)
+        if (radius > 92 && radius < 110 && b - r > 60 && b - g > 20 && g - r > 25) { count++; yTotal += y }
+      }
+      return { count, y: yTotal / count }
+    })
+    expect(highlight.count).toBeGreaterThan(30)
+    highlights.push(highlight)
+  }
+  expect(Math.abs(highlights[1].y - highlights[0].y)).toBeLessThan(6)
+})
+
+
+test('delivered nested fusion connectors keep all three input embeddings clear', async ({ page }) => {
+  await page.goto('/')
+  const video = page.locator('.architecture-video')
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).readyState)).toBeGreaterThan(1)
+  await page.getByRole('slider', { name: 'Architecture film progress' }).fill('20')
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).seeking)).toBe(false)
+  const regions = await video.evaluate(element => {
+    const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360
+    const context = canvas.getContext('2d')!
+    context.drawImage(element as HTMLVideoElement, 0, 0, 640, 360)
+    const pixels = context.getImageData(0, 0, 640, 360).data
+    return [91, 116, 141].map(center => {
+      const counts = [0, 0, 0]
+      for (let y = center - 12; y < center + 12; y++) for (let x = 304; x <= 336; x++) {
+        const offset = (y * 640 + x) * 4, [r, g, b] = pixels.slice(offset, offset + 3)
+        if (b - r > 25 && b - g > 10 && r < 215) counts[0]++
+        if (g - r > 15 && g - b > 0) counts[1]++
+        if (r - b > 30 && r - g > 8) counts[2]++
+      }
+      return counts
+    })
+  })
+  for (const [view, counts] of regions.entries()) {
+    expect(counts[view]).toBeGreaterThan(20)
+    for (const [color, count] of counts.entries()) if (color !== view) expect(count).toBeLessThanOrEqual(2)
+  }
+})
+
+test('delivered prediction signals advance through every layer in separate phases', async ({ page }) => {
+  await page.goto('/')
+  const video = page.locator('.architecture-video')
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).readyState)).toBeGreaterThan(1)
+  for (const [phase, time] of [31, 32.7, 34.2].entries()) {
+    await page.getByRole('slider', { name: 'Architecture film progress' }).fill(String(time))
+    await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).seeking)).toBe(false)
+    const spans = await video.evaluate(element => {
+      const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360
+      const context = canvas.getContext('2d')!
+      context.drawImage(element as HTMLVideoElement, 0, 0, 640, 360)
+      const pixels = context.getImageData(0, 0, 640, 360).data
+      return [[200, 255], [295, 345], [390, 435]].map(([left, right]) => {
+        let colored = 0
+        for (let y = 165; y < 273; y++) for (let x = left; x < right; x++) {
+          const offset = (y * 640 + x) * 4, [r, g, b] = pixels.slice(offset, offset + 3)
+          if ((b - r > 60 && b - g > 25) || (g - r > 30 && g - b > 0) || (r - b > 50 && r - g > 20)) colored++
+        }
+        return colored
+      })
+    })
+    for (const [span, count] of spans.entries()) {
+      if (span === phase) expect(count).toBeGreaterThan(8)
+      else expect(count).toBeLessThanOrEqual(3)
+    }
+  }
 })

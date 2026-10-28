@@ -727,7 +727,7 @@ a svg {
   mix-blend-mode: multiply;
 }
 
-/* A finite assembly reveal; the structure settles before measurement. */
+/* One visible bond assembly, then a stable structure for inspection. */
 .molecule-2d-canvas {
   position: relative;
   display: flex;
@@ -743,62 +743,18 @@ a svg {
   width: 100%;
   height: 100%;
   max-height: 260px;
+  contain: paint;
   object-fit: contain;
   mix-blend-mode: multiply;
 }
-.molecule-2d-canvas.is-assembling .molecule-2d-svg {
-  animation: molecule2dEntrance 280ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-@keyframes molecule2dEntrance {
-  0% {
-    opacity: 0.2;
-    transform: translateY(4px) scale(0.97);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 .molecule-bond {
   stroke-width: 3.8px !important;
   stroke-linecap: round !important;
   stroke-linejoin: round !important;
 }
-.molecule-2d-canvas.is-assembling .molecule-bond {
-  animation: bondAssembleIn 180ms var(--ease-out-quart) both;
-  animation-delay: var(--bond-delay, 0ms);
+.molecule-2d-canvas[data-assembly-pending="true"] :is(.molecule-bond, .molecule-atom) {
+  opacity: 0;
 }
-
-@keyframes bondAssembleIn {
-  0% {
-    opacity: 0;
-  }
-  45% {
-    opacity: 0.9;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-.molecule-2d-canvas.is-assembling .molecule-atom {
-  animation: atomAssembleIn 140ms var(--ease-out-quart) both;
-  animation-delay: var(--atom-delay, 40ms);
-}
-
-@keyframes atomAssembleIn {
-  0% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-
-
 
 .conformer-viewer {
   position: relative;

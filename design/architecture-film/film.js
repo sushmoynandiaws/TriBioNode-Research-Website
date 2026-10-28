@@ -1,11 +1,21 @@
 import * as THREE from '../../public/vendor/three/three.module.js';
 import { RoomEnvironment } from '../../public/vendor/three/RoomEnvironment.js';
-export const DURATION = 44;
+export const DURATION = 40;
 export const CHAPTERS = [0, 6, 18, 29, 36];
 const clamp = x => Math.max(0, Math.min(1, x));
 const ease = x => { x = clamp(x); return x*x*(3-2*x); };
 const mix = (a,b,t) => a+(b-a)*t;
 const v = (x=0,y=0,z=0) => new THREE.Vector3(x,y,z);
+export const inputScanAngle = time => mix(-Math.PI*.75,Math.PI*.25,ease((time-.4)/4.2));
+export const predictionSignal = (time,layer,source) => (time-30.3-layer*1.65-source*.04)/1.15;
+export function fusionConnector(source,target){
+  const side=Math.sign(target.x),radius=.18,curve=new THREE.CurvePath();
+  const start=source.clone().add(v(side*.64,0,0)),bend=v(target.x-side*radius,source.y,0),drop=v(target.x,source.y-radius,0);
+  curve.add(new THREE.LineCurve3(start,bend));
+  curve.add(new THREE.QuadraticBezierCurve3(bend,v(target.x,source.y,0),drop));
+  curve.add(new THREE.LineCurve3(drop,target));
+  return curve;
+}
 
 export function createFilm(canvas, geometry, record, width=3840, height=2160) {
   if (!geometry.atoms?.length || geometry.atoms.some(a=>a.position.length!==3||!a.position.every(Number.isFinite))) throw Error('Invalid film geometry');
@@ -50,7 +60,7 @@ export function createFilm(canvas, geometry, record, width=3840, height=2160) {
     geometry.atoms.forEach((a,i)=>sphere(group,points[i],scale*(a.element==='C'?.54:.68),({O:coral,N:nitrogen,Cl:chlorine})[a.element]||carbon));return group;
   }
   function embedding(group,p,m,scale=1){const root=new THREE.Group();root.position.copy(p);root.scale.setScalar(scale);for(let i=0;i<9;i++)block(root,v((i-4)*.15,0,0),[.10,.35+((i*7)%5)*.14,.22],m);group.add(root);return root;}
-  function route(group,points,m){const curve=new THREE.CatmullRomCurve3(points);const mesh=new THREE.Mesh(geo(new THREE.TubeGeometry(curve,60,.025,6,false)),m);mesh.userData.path=curve.getPoints(80);group.add(mesh);const pulse=sphere(group,v(),.085,m);return {curve,pulse};}
+  function route(group,points,m){const curve=Array.isArray(points)?new THREE.CatmullRomCurve3(points):points;const mesh=new THREE.Mesh(geo(new THREE.TubeGeometry(curve,60,.025,6,false)),m);mesh.userData.path=curve.getPoints(80);group.add(mesh);const pulse=sphere(group,v(),.085,m);return {curve,mesh,pulse};}
   const stages=Array.from({length:5},()=>new THREE.Group());stages.forEach(g=>scene.add(g));
   const titles=['One molecule. Three complementary views.','Three representations, learned together.','Two fusion paths. In parallel.','Combine the representations. Predict a property.','Aqueous solubility, predicted.'];
   const subtitles=['Molecular input · ESOL 044','Sequence Transformer · Hierarchical graph · Fixed 3D distances','The same three embeddings feed both fusion branches','Concatenate → prediction MLP','Saved ESOL example · not live inference'];
@@ -59,10 +69,12 @@ export function createFilm(canvas, geometry, record, width=3840, height=2160) {
     const captions=new THREE.Group();text(captions,titles[i],v(0,portrait?4.45:4.05,0),portrait?5.45:12,'#18394e','600',.52);
     text(captions,subtitles[i],v(0,portrait?3.8:3.43,0),portrait?5.2:10.5,'#3f5e72','500',.26);group.add(captions);captionGroups.push(captions);
   });
-  // Input: optical scan, then three outgoing representation paths.
-  const input=molecule(.49);stages[0].add(input);
-  const aperture=ring(stages[0],2.7,silver);aperture.rotation.x=.3;
-  const scanner=ring(stages[0],2.75,blue);scanner.rotation.x=Math.PI/2;
+  // Keep the optical sweep on the perimeter, away from the molecular silhouette.
+  const inputFit=portrait?.92:1;
+  const input=molecule(.38);stages[0].add(input);
+  const opticalFrame=new THREE.Group();opticalFrame.rotation.x=.18;opticalFrame.position.z=.25;opticalFrame.scale.setScalar(inputFit);stages[0].add(opticalFrame);
+  ring(opticalFrame,2.85,silver);
+  const scanner=new THREE.Mesh(geo(new THREE.TorusGeometry(2.95,.04,12,100,Math.PI*.45)),blue);scanner.userData.preciseBounds=true;opticalFrame.add(scanner);
   const inputPaths=palette.map((m,i)=>route(stages[0],[v(0,-1.8,-.2),v((i-1)*1.4,-2.5,.3),v((i-1)*2.7,-3.1,.2)],m));
   text(stages[0],record.smiles,v(0,-3.7,0),portrait?5:10,'#526d81');
   // Encoders: real graph topology, conceptual motif pooling and real RBF distances.
@@ -98,9 +110,13 @@ export function createFilm(canvas, geometry, record, width=3840, height=2160) {
   gated.position.copy(portrait?v(-1.55,0):v(-3.7,0));cross.position.copy(portrait?v(1.55,0):v(3.7,0));if(portrait){gated.scale.setScalar(.7);cross.scale.setScalar(.7);}
   const gates=[],fusionRoutes=[],fusionInputs=[];
   palette.forEach((m,i)=>{
-    const source=portrait?v((i-1)*1.45,2.9,0):v((i-1)*1.7,2.4,0);fusionInputs.push(embedding(fusion,source,m,.65));
-    fusionRoutes.push(route(fusion,[source,v(gated.position.x+(i-1)*.45,portrait?1.7:1.65,.25),gated.position.clone().add(v((i-1)*(portrait?.63:.9),portrait?.7:1.0,0))],m));
-    fusionRoutes.push(route(fusion,[source,v(cross.position.x+(i-1)*.45,portrait?1.7:1.65,-.25),cross.position.clone().add(v((i-1)*(portrait?.63:.9),portrait?.7:1.0,0))],m));
+    const source=v(0,2.8-i*.75,0);fusionInputs.push(embedding(fusion,source,m,.65));
+    // Nested lanes keep the same three inputs connected to both branches without crossings.
+    for(const [side,branch] of [[-1,gated],[1,cross]]){
+      const targetY=side<0?(.25+record.gates[i]*1.35)*.5*(portrait?.7:1)+.1:.6*(portrait?.7:1);
+      const target=v(branch.position.x+side*(1-i)*(portrait?.63:.9),targetY,0);
+      fusionRoutes.push(route(fusion,fusionConnector(source,target),m));
+    }
     const gate=block(gated,v((i-1)*.93,0,0),[.50,.25+record.gates[i]*1.35,.50],m);gates.push(gate);
     if(!portrait)text(gated,(record.gates[i]*100).toFixed(2)+'%',v((i-1)*.93,-1.0,0),1.15);
   });
@@ -121,9 +137,13 @@ export function createFilm(canvas, geometry, record, width=3840, height=2160) {
     const list=[];for(let i=0;i<count;i++){const p=portrait?v((i-(count-1)/2)*.62,.1-layer*.9,0):v((layer-1.5)*2.7,(i-(count-1)/2)*.59-.75,(layer%2)*.25);list.push(sphere(head,p,layer===3?.24:.14,palette[layer%3]));}nodes.push(list);
   });
   nodes.flat().forEach(node=>{node.material=node.material.clone();surfaces.push(node.material);});
-  nodes.slice(0,-1).forEach((list,l)=>list.forEach(a=>nodes[l+1].forEach(b=>{link(head,a.position,b.position,.016,silver);})));
-  for(let i=0;i<3;i++)headRoutes.push(route(head,[nodes[0][i].position,nodes[1][i%5].position,nodes[2][i%3].position,nodes[3][0].position],palette[i]));
+  nodes.slice(0,-1).forEach((list,layer)=>list.forEach((a,source)=>nodes[layer+1].forEach((b,target)=>{
+    link(head,a.position,b.position,.016,silver);
+    headRoutes.push({a,b,layer,source,target,pulse:sphere(head,v(),.055,palette[layer])});
+  })));
+  [512,256,128,1].forEach((count,layer)=>text(head,portrait?String(count):count+(layer===3?' output':' features'),portrait?v(2.3,.1-layer*.9,0):v((layer-1.5)*2.7,-2.75,0),portrait?.9:2.3,'#526d81','500',.25));
   text(head,'Prediction MLP · 512 → 256 → 128 → 1',v(0,portrait?-3.5:-3.3,0),portrait?5.2:10);
+  text(head,'Schematic nodes · all shown connections animated',v(0,portrait?-4.15:-3.9,0),portrait?5.3:10,'#526d81','500',.25);
   // Output is a stored observation, never a fabricated real-time inference.
   const output=stages[4];const outputMolecule=molecule(portrait?.20:.28);outputMolecule.position.set(portrait?0:-4.3,portrait?1.8:0,0);output.add(outputMolecule);
   const resultGroup=new THREE.Group();resultGroup.position.set(portrait?0:2.3,portrait?-.8:.25,0);output.add(resultGroup);
@@ -137,7 +157,7 @@ export function createFilm(canvas, geometry, record, width=3840, height=2160) {
   const fadeScene=new THREE.Scene(),fadeCamera=new THREE.OrthographicCamera(-1,1,1,-1,.1,2);fadeCamera.position.z=1;
   const fadeMaterial=new THREE.MeshBasicMaterial({color:0xe3ecf4,transparent:true,depthTest:false,depthWrite:false,toneMapped:false});surfaces.push(fadeMaterial);
   fadeScene.add(new THREE.Mesh(geo(new THREE.PlaneGeometry(2,2)),fadeMaterial));renderer.autoClear=false;
-  const boundaries=[0,6,18,29,36,44];
+  const boundaries=[...CHAPTERS,DURATION];
   function render(time,draw=true){
     time=Math.max(0,Math.min(DURATION-.001,time));
     let active=0;
@@ -145,8 +165,8 @@ export function createFilm(canvas, geometry, record, width=3840, height=2160) {
     stages.forEach((group,i)=>{group.visible=i===active;});
     fadeMaterial.opacity=1-(active===0?1:ease((time-boundaries[active])/.4))*(active===stages.length-1?1:1-ease((time-boundaries[active+1]+.4)/.4));
     const enter=ease(time/2);
-    input.position.set(0,mix(.5,0,enter),mix(-3,0,enter));input.scale.setScalar(mix(.6,1,enter));input.rotation.set(-.25+Math.sin(time*.5)*.08,-.3+Math.sin(time*.3)*.25,.18);
-    scanner.position.y=mix(-2.2,2.2,(time%4)/4);inputPaths.forEach((r,i)=>{r.pulse.position.copy(r.curve.getPointAt(clamp((time-3.1-i*.18)/1.8)));r.pulse.visible=time>3;});
+    input.position.set(0,mix(.5,0,enter),mix(-3,0,enter));input.scale.setScalar(mix(.6,1,enter)*inputFit);input.rotation.set(-.25+Math.sin(time*.5)*.08,-.3+Math.sin(time*.3)*.25,.18);
+    scanner.rotation.z=inputScanAngle(time);inputPaths.forEach((r,i)=>{const progress=(time-3.1-i*.18)/1.8;r.pulse.position.copy(r.curve.getPointAt(clamp(progress)));r.pulse.visible=progress>=0&&progress<=1;});
     views.forEach((g,i)=>g.position.copy(viewCenters[i]));
     tokenMeshes.forEach((g,i)=>{g.position.y=.55+Math.sin(time*1.2-i*.5)*.06;g.rotation.y=Math.sin(time*.7-i*.3)*.12;});
     encoderFlows.forEach((flow,i)=>{const u=clamp((time-10-i*.35)/3.7);flow.pulse.visible=time>=10&&time<17;flow.pulse.position.copy(flow.curve.getPointAt(u));});
@@ -155,18 +175,24 @@ export function createFilm(canvas, geometry, record, width=3840, height=2160) {
     alignment.visible=time>=13.5;encoded.forEach((g,i)=>{g.visible=true;g.scale.setScalar((portrait?.5:.8)*ease((time-12.5-i*.3)/1.4));});
     gatedOutput.visible=crossOutput.visible=time>=23;
     gates.forEach((g,i)=>{g.scale.y=(.25+record.gates[i]*1.35)*mix(.15,1,ease((time-19.3-i*.2)/2));});
-    fusionRoutes.forEach((r,i)=>{r.pulse.visible=time>=19.2;r.pulse.position.copy(r.curve.getPointAt(((Math.max(0,time-19.2)*.22+i*.11)%1)));});
+    fusionRoutes.forEach((r,i)=>{const progress=(time-19-Math.floor(i/2)*.18)/3;r.pulse.visible=progress>=0&&progress<=1;r.pulse.position.copy(r.curve.getPointAt(clamp(progress)));});
     attention.rotation.y=Math.sin(time*.23)*.16;
-    h1.visible=h2.visible=true;h1.position.x=mix(-.95,-.73,ease((time-30.2)/1.2));h2.position.x=-h1.position.x;
-    headRoutes.forEach((r,i)=>r.pulse.position.copy(r.curve.getPointAt(clamp((time-31.4-i*.45)/3.4))));
+    h1.visible=h2.visible=true;h1.position.x=mix(-.95,-.73,ease((time-29.4)/.7));h2.position.x=-h1.position.x;
+    headRoutes.forEach(r=>{const progress=predictionSignal(time,r.layer,r.source);r.pulse.visible=progress>0&&progress<1;r.pulse.position.lerpVectors(r.a.position,r.b.position,clamp(progress));});
     outputMolecule.rotation.set(-.25,-.25+Math.sin(time*.25)*.15,.18);
-    nodes.forEach((layer,i)=>layer.forEach(node=>{const activation=Math.max(0,1-Math.abs((time-31.2)*1.05-i));node.material.emissive.copy(node.material.color);node.material.emissiveIntensity=activation*.35;}));
+    nodes.forEach((list,layer)=>list.forEach(node=>{const arrival=layer===0?30.15:30.3+(layer-1)*1.65+1.15,lastEmit=layer===3?35.35:30.3+layer*1.65+(list.length-1)*.04+.35;const activation=ease((time-arrival)/.22)*(1-ease((time-lastEmit)/.5));node.material.emissive.copy(node.material.color);node.material.emissiveIntensity=activation*.5;}));
     camera.position.x=Math.sin(time*.13)*.05;camera.lookAt(0,.15,0);camera.updateMatrixWorld();scene.updateMatrixWorld(true);
     if(draw){renderer.clear();renderer.render(scene,camera);if(fadeMaterial.opacity>0)renderer.render(fadeScene,fadeCamera);}
-    canvas.dataset.chapter=String(active);canvas.dataset.time=time.toFixed(2);canvas.dataset.state='ready';
+    canvas.dataset.chapter=String(active);canvas.dataset.time=time.toFixed(2);canvas.dataset.state='ready';canvas.dataset.scanAngle=scanner.rotation.z.toFixed(6);
+    canvas.dataset.headConnections=nodes.slice(0,-1).map((_,layer)=>headRoutes.filter(r=>r.layer===layer).length).join(',');
+    canvas.dataset.headActiveSources=nodes.slice(0,-1).map((_,layer)=>new Set(headRoutes.filter(r=>r.layer===layer&&r.pulse.visible).map(r=>r.source)).size).join(',');
   }
   function checkLayout(){
     const issues=[],meshes=[],rectangles=[];
+    nodes.slice(0,-1).forEach((list,layer)=>list.forEach((_,source)=>{
+      const targets=headRoutes.filter(r=>r.layer===layer&&r.source===source).map(r=>r.target);
+      if(new Set(targets).size!==nodes[layer+1].length)issues.push('Missing dense prediction connection');
+    }));
     const project=p=>{p.project(camera);return {x:(p.x+1)*width/2,y:(1-p.y)*height/2};};
     scene.traverseVisible(object=>{
       if(object.material?.opacity<.05)return;
@@ -193,14 +219,38 @@ export function createFilm(canvas, geometry, record, width=3840, height=2160) {
       if(mesh.userData.path)return {mesh,path:mesh.userData.path.map(p=>project(p.clone().applyMatrix4(mesh.parent.matrixWorld)))};
       if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();
       const {min,max}=mesh.geometry.boundingBox,points=[];
-      for(const x of [min.x,max.x])for(const y of [min.y,max.y])for(const z of [min.z,max.z])points.push(project(v(x,y,z).applyMatrix4(mesh.matrixWorld)));
+      // A rotated arc's box includes empty corners; project its actual surface instead.
+      if(mesh.userData.preciseBounds){const positions=mesh.geometry.attributes.position;for(let i=0;i<positions.count;i++)points.push(project(v().fromBufferAttribute(positions,i).applyMatrix4(mesh.matrixWorld)));}
+      else for(const x of [min.x,max.x])for(const y of [min.y,max.y])for(const z of [min.z,max.z])points.push(project(v(x,y,z).applyMatrix4(mesh.matrixWorld)));
       return {mesh,rect:{left:Math.min(...points.map(p=>p.x)),right:Math.max(...points.map(p=>p.x)),top:Math.min(...points.map(p=>p.y)),bottom:Math.max(...points.map(p=>p.y))}};
     });
     const lookup=new Map(meshBounds.map(item=>[item.mesh,item]));
+    if(stages[0].visible){
+      const boundary=Array.from({length:120},(_,i)=>project(opticalFrame.localToWorld(v(Math.cos(i*Math.PI/60)*2.67,Math.sin(i*Math.PI/60)*2.67,0))));
+      const inside=p=>{let result=false;for(let i=0,j=boundary.length-1;i<boundary.length;j=i++){const a=boundary[i],b=boundary[j];if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)result=!result;}return result;};
+      input.traverse(object=>{const bounds=lookup.get(object)?.rect;if(bounds&&[[bounds.left,bounds.top],[bounds.right,bounds.top],[bounds.left,bounds.bottom],[bounds.right,bounds.bottom]].some(([x,y])=>!inside({x,y})))issues.push('Input molecule crosses optical ring clearance');});
+      opticalFrame.traverse(object=>{const bounds=lookup.get(object)?.rect;if(bounds&&(bounds.left<8||bounds.right>width-8||bounds.top<8||bounds.bottom>height-8))issues.push('Optical ring clipped by viewport');});
+    }
     const region=roots=>{
       const boxes=[];for(const root of [roots].flat())root.traverseVisible(object=>{const item=lookup.get(object);if(item)boxes.push(item.rect||{left:Math.min(...item.path.map(p=>p.x)),right:Math.max(...item.path.map(p=>p.x)),top:Math.min(...item.path.map(p=>p.y)),bottom:Math.max(...item.path.map(p=>p.y))});});
       return boxes.length?{left:Math.min(...boxes.map(b=>b.left)),right:Math.max(...boxes.map(b=>b.right)),top:Math.min(...boxes.map(b=>b.top)),bottom:Math.max(...boxes.map(b=>b.bottom))}:null;
     };
+    if(stages[2].visible)for(const input of fusionInputs){
+      const bounds=region(input),clearance={left:bounds.left-12,right:bounds.right+12,top:bounds.top-12,bottom:bounds.bottom+12};
+      for(const {mesh,pulse} of fusionRoutes){
+        const path=lookup.get(mesh)?.path;
+        if(path?.some((p,i)=>i&&segmentHits(clearance,path[i-1],p)))issues.push('Fusion connector crosses input embedding');
+        const pulseBounds=lookup.get(pulse)?.rect;
+        if(pulseBounds&&overlaps(clearance,pulseBounds))issues.push('Fusion pulse crosses input embedding');
+      }
+    }
+    if(stages[2].visible){
+      const paths=fusionRoutes.map(({mesh})=>lookup.get(mesh).path);
+      const turn=(a,b,c)=>(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
+      paths.forEach((path,index)=>paths.slice(index+1).forEach(other=>{
+        if(path.some((b,i)=>i&&other.some((d,j)=>j&&turn(path[i-1],b,other[j-1])*turn(path[i-1],b,d)<0&&turn(other[j-1],d,path[i-1])*turn(other[j-1],d,b)<0)))issues.push('Fusion lanes cross');
+      }));
+    }
     for(const [a,b,name] of [[views[0],views[1],'Sequence / structure'],[views[1],views[2],'Structure / geometry'],[graph,motifs,'Atom graph / motif pool'],[spatial,matrix,'Molecule / distance matrix'],[gated,cross,'Parallel fusion branches'],[h1,h2,'Concatenated embeddings']]){
       const first=region(a),second=region(b);if(first&&second&&overlaps(first,second))issues.push('Separate components overlap: '+name);
     }
