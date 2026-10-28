@@ -2,7 +2,7 @@ import Icon from './Icon'
 import { useEffect, useState, useRef, useId, useMemo } from 'react'
 import { asset } from './research'
 
-type Geometry = {
+export type Geometry = {
   atoms: { element: string; position: number[] }[]
   bonds: { start: number; end: number; order: number }[]
   method: string
@@ -19,7 +19,7 @@ const colors: Record<string, string> = {
   P: '#a96520',
 }
 
-export default function ConformerViewer({ path, name }: { path: string | null; name: string }) {
+export default function ConformerViewer({ path, directGeometry, name }: { path?: string | null; directGeometry?: Geometry | null; name: string }) {
   const atomGradient = useId()
   const [loaded, setLoaded] = useState<{ path: string; geometry: Geometry } | null>(null)
   const [error, setError] = useState(false)
@@ -33,6 +33,17 @@ export default function ConformerViewer({ path, name }: { path: string | null; n
   const lastReplay = useRef(0)
 
   useEffect(() => {
+    if (directGeometry) {
+      if (!directGeometry.atoms?.length || !directGeometry.bonds) {
+        setError(true)
+        return
+      }
+      setError(false)
+      setLoaded({ path: 'direct-live-geometry', geometry: directGeometry })
+      setRotation([0.3, -0.4])
+      setZoom(1)
+      return
+    }
     if (!path) return
     const controller = new AbortController()
     setError(false)
@@ -51,7 +62,7 @@ export default function ConformerViewer({ path, name }: { path: string | null; n
         if (reason.name !== 'AbortError') setError(true)
       })
     return () => controller.abort()
-  }, [path, retry])
+  }, [path, directGeometry, retry])
 
   function settleAssembly() {
     animations.current.forEach(animation => animation.cancel())
@@ -62,7 +73,8 @@ export default function ConformerViewer({ path, name }: { path: string | null; n
     const replay = lastReplay.current !== assemblyKey
     lastReplay.current = assemblyKey
     const root = model.current
-    if (loaded?.path !== path || !root || !replay) return
+    if (!loaded || !root || !replay) return
+    if (path && loaded.path !== path) return
     const preference = matchMedia('(prefers-reduced-motion: reduce)')
     const settleIfNeeded = () => { if (preference.matches || document.hidden) settleAssembly() }
     if (!preference.matches && !document.hidden) {
@@ -82,7 +94,7 @@ export default function ConformerViewer({ path, name }: { path: string | null; n
       preference.removeEventListener('change', settleIfNeeded)
       document.removeEventListener('visibilitychange', settleIfNeeded)
     }
-  }, [loaded, path, assemblyKey])
+  }, [loaded, path, assemblyKey, directGeometry])
 
   const centered = useMemo(() => {
     if (!loaded) return []
@@ -90,9 +102,9 @@ export default function ConformerViewer({ path, name }: { path: string | null; n
     return loaded.geometry.atoms.map(atom => atom.position.map((value, axis) => value - center[axis]))
   }, [loaded])
 
-  if (!path) return <p className="viewer-loading">A reliable 3D conformer is unavailable for this molecule. Its 2D structure and saved predictions are available.</p>
+  if (!path && !directGeometry) return <p className="viewer-loading">A reliable 3D conformer is unavailable for this molecule. Its 2D structure and saved predictions are available.</p>
   if (error) return <div className="viewer-loading" role="alert"><p>The conformer could not be loaded.</p><button className="button compact secondary" onClick={() => setRetry(retry + 1)}>Retry 3D view</button></div>
-  if (loaded?.path !== path) return <p className="viewer-loading" role="status">Loading molecular conformer…</p>
+  if (!loaded || (path && loaded.path !== path)) return <p className="viewer-loading" role="status">Loading molecular conformer…</p>
 
   const geometry = loaded.geometry
   const size = Math.max(...centered.map(a => Math.hypot(...a)), 1)

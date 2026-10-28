@@ -55,6 +55,11 @@ export default function MolecularStructure2D({ structure, name, id, replayCount 
   const lastReplay = useRef(replayCount)
 
   useEffect(() => {
+    if (structure.trim().startsWith('<svg') || structure.trim().startsWith('<?xml')) {
+      const svg = transformSvg(structure)
+      setLoaded({ structure, svg })
+      return
+    }
     if (svgCache.has(structure)) {
       const svg = svgCache.get(structure)!
       setLoaded(current => current.structure === structure && current.svg === svg ? current : { structure, svg })

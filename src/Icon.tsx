@@ -11,6 +11,7 @@ const shapes = {
   up: <path d="M12 20V4m-6 6 6-6 6 6" />,
   molecule: <><path d="m6 7 11 3-6 9-5-12" /><circle cx="6" cy="7" r="3" /><circle cx="17" cy="10" r="3" /><circle cx="11" cy="19" r="2" /></>,
   geometry: <><path d="m12 2 9 5v10l-9 5-9-5V7Zm0 10 9-5M12 12 3 7m9 5v10" /></>,
+  sparkles: <><path d="m12 3 1.9 4.8L18.7 9.7l-4.8 1.9L12 16.4l-1.9-4.8L5.3 9.7l4.8-1.9L12 3Z" /><path d="M19 16l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2Z" /></>,
 }
 
 export default function Icon({ name, size = 18 }: { name: keyof typeof shapes; size?: number }) {

@@ -5,6 +5,9 @@ import type { Molecule } from './research'
 import ArchitectureFilm from './ArchitectureFilm'
 import Icon from './Icon'
 import MolecularStructure2D from './MolecularStructure2D'
+import { checkBackendHealth, predictSmiles } from './api'
+import type { BackendHealth, LivePredictionResult } from './api'
+import type { Geometry } from './ConformerViewer'
 
 const ResultsCharts = lazy(() => import('./ResultsCharts'))
 const ConformerViewer = lazy(() => import('./ConformerViewer'))
@@ -53,70 +56,494 @@ function PredictionComparison({ molecule }: { molecule: Molecule }) {
   return <div className="prediction-plot"><div className="small-heading"><h4>Prediction comparison</h4><span>log₁₀(mol/L)</span></div><div className="prediction-chart-scroll" role="region" tabIndex={0} aria-label="Prediction comparison chart; scroll horizontally to inspect"><svg viewBox="0 0 640 210" role="img" aria-label={`Predictions compared with experimental log solubility ${fmt(molecule.target)}. Dashed line marks the observation.`}><line x1={position(molecule.target) * 6.4} x2={position(molecule.target) * 6.4} y1="12" y2="169" stroke="var(--text-2)" strokeDasharray="4 4" /><text x={position(molecule.target) * 6.4} y="200" textAnchor="middle" fill="var(--text-2)" fontSize="14">Observed {fmt(molecule.target, 2)}</text>{research.views.map((view, i) => <g key={view.key}><text x="2" y={34 + i * 39} fill={view.color} fontSize="14" fontWeight="600">{view.label}</text><line x1="105" x2="572" y1={30 + i * 39} y2={30 + i * 39} stroke="var(--hairline)" /><line x1={position(molecule.target) * 6.4} x2={position(molecule.predictions[view.key]) * 6.4} y1={30 + i * 39} y2={30 + i * 39} stroke={view.color} strokeWidth="2" opacity="0.45" /><circle cx={position(molecule.predictions[view.key]) * 6.4} cy={30 + i * 39} r="6" fill={view.color}><title>{view.label}: {fmt(molecule.predictions[view.key])}</title></circle><text x="635" y={34 + i * 39} textAnchor="end" fill={view.color} fontSize="14" fontWeight="600">{fmt(molecule.predictions[view.key])}</text></g>)}</svg></div><p className="chart-scroll-hint">Scroll horizontally to inspect the chart.</p></div>
 }
 
+function getUspSolubilityClass(logS: number): { label: string; classTag: string; color: string; bg: string } {
+  if (logS > 0) return { label: 'Very Soluble', classTag: 'USP > 1000 mg/mL', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' }
+  if (logS >= -1) return { label: 'Freely Soluble', classTag: 'USP 100-1000 mg/mL', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' }
+  if (logS >= -2) return { label: 'Soluble', classTag: 'USP 33-100 mg/mL', color: '#0ea5e9', bg: 'rgba(14, 165, 233, 0.12)' }
+  if (logS >= -3) return { label: 'Sparingly Soluble', classTag: 'USP 10-33 mg/mL', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)' }
+  if (logS >= -4) return { label: 'Slightly Soluble', classTag: 'USP 1-10 mg/mL', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' }
+  if (logS >= -6) return { label: 'Very Slightly Soluble', classTag: 'USP 0.1-1 mg/mL', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)' }
+  return { label: 'Practically Insoluble', classTag: 'USP < 0.1 mg/mL', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' }
+}
+
+function getFormattedConcentration(logS: number, mw?: number) {
+  const molar = Math.pow(10, logS)
+  const mM = molar * 1000
+  const mgMl = molar * (mw || 180)
+
+  let formattedMass = ''
+  if (mgMl >= 100) formattedMass = `${mgMl.toFixed(1)} mg/mL`
+  else if (mgMl >= 1) formattedMass = `${mgMl.toFixed(2)} mg/mL`
+  else if (mgMl >= 0.001) formattedMass = `${(mgMl * 1000).toFixed(1)} µg/mL`
+  else formattedMass = `${(mgMl * 1e6).toFixed(1)} ng/mL`
+
+  const formattedMolar = mM >= 1 ? `${mM.toFixed(1)} mM` : `${(mM * 1000).toFixed(1)} µM`
+  return { formattedMass, formattedMolar }
+}
+
+function getDominantView(gates?: number[]) {
+  if (!gates || gates.length < 3) return { name: 'Multi-View', percent: '100', index: 2 }
+  const viewNames = ['1D Sequence', '2D Graph', '3D Geometry']
+  let maxIdx = 0
+  for (let i = 1; i < 3; i++) {
+    if ((gates[i] || 0) > (gates[maxIdx] || 0)) {
+      maxIdx = i
+    }
+  }
+  const pct = ((gates[maxIdx] || 0) * 100).toFixed(1)
+  return { name: viewNames[maxIdx], percent: pct, index: maxIdx }
+}
+
+const quickSamples = [
+  { name: 'Aspirin', smiles: 'CC(=O)Oc1ccccc1C(=O)O' },
+  { name: 'Paracetamol', smiles: 'CC(=O)Nc1ccc(O)cc1' },
+  { name: 'Caffeine', smiles: 'Cn1cnc2c1c(=O)n(c(=O)n2C)C' },
+  { name: 'Ibuprofen', smiles: 'CC(C)Cc1ccc(cc1)C(C)C(=O)O' },
+  { name: 'Penicillin G', smiles: 'CC1(C(N2C(S1)C(C2=O)NC(=O)Cc3ccccc3)C(=O)O)C' },
+]
+
 function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => void }) {
+  const [tab, setTab] = useState<'atlas' | 'live'>('atlas')
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState(heroMolecule.id)
   const [dimension, setDimension] = useState<'2d' | '3d'>('2d')
   const [status, setStatus] = useState('')
   const [replayCount, setReplayCount] = useState(0)
+
+  // Live inference state
+  const [liveSmiles, setLiveSmiles] = useState('CC(=O)Oc1ccccc1C(=O)O')
+  const [liveLoading, setLiveLoading] = useState(false)
+  const [liveError, setLiveError] = useState<string | null>(null)
+  const [liveResult, setLiveResult] = useState<LivePredictionResult | null>(null)
+  const [backendHealth, setBackendHealth] = useState<BackendHealth | null>(null)
+
+  useEffect(() => {
+    checkBackendHealth().then(setBackendHealth)
+  }, [])
+
   const filtered = matchingRecords(query)
   const molecule = filtered.find(r => r.id === selectedId) ?? filtered[0]
+
   function choose(record: Molecule) {
     setSelectedId(record.id)
     setStatus('')
     setReplayCount(c => c + 1)
     onSelected(record)
   }
+
   function example(id: string) {
     const record = research.records.find(r => r.id === id)!
     setQuery('')
     choose(record)
   }
-  async function copySmiles() {
-    if (!molecule) return
+
+  async function copySmiles(textToCopy?: string) {
+    const targetText = textToCopy || molecule?.smiles
+    if (!targetText) return
     try {
-      await navigator.clipboard.writeText(molecule.smiles)
+      await navigator.clipboard.writeText(targetText)
       setStatus('SMILES copied to clipboard.')
     } catch {
       setStatus('Clipboard unavailable. Select the SMILES text below and copy it manually.')
     }
   }
-  function download() {
-    if (!molecule) return
-    const url = URL.createObjectURL(new Blob([JSON.stringify(resultExport(molecule), null, 2)], { type: 'application/json' }))
+
+  function download(customRecord?: Molecule) {
+    const targetRecord = customRecord || molecule
+    if (!targetRecord) return
+    const url = URL.createObjectURL(new Blob([JSON.stringify(resultExport(targetRecord), null, 2)], { type: 'application/json' }))
     const link = document.createElement('a')
     link.href = url
-    link.download = `tribionode-${molecule.id}.json`
+    link.download = `tribionode-${targetRecord.id}.json`
     link.click()
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
     setStatus('Result exported as JSON.')
   }
+
   function reset() {
     setQuery('')
     setDimension('2d')
     choose(heroMolecule)
   }
+
+  async function runLiveInference(smilesInput?: string) {
+    const smilesToUse = (smilesInput || liveSmiles).trim()
+    if (!smilesToUse) return
+    setLiveLoading(true)
+    setLiveError(null)
+    setStatus('Running multi-view model inference...')
+    try {
+      const res = await predictSmiles(smilesToUse)
+      setLiveResult(res)
+      const liveMolecule: Molecule = {
+        id: `live-${Date.now()}`,
+        ordinal: 0,
+        smiles: res.smiles,
+        canonicalSmiles: res.canonicalSmiles,
+        target: res.predictions.fused,
+        predictions: res.predictions,
+        gates: res.gates,
+        structure: res.structureSvg || '',
+        conformer: null,
+        atoms: res.metrics.atoms,
+        rings: res.metrics.rings,
+        mass: res.metrics.mass,
+      }
+      onSelected(liveMolecule)
+      setStatus(res.isFallback ? 'Simulated prediction completed.' : 'Prediction received from model.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Inference failed'
+      setLiveError(msg)
+      setStatus('Error running inference.')
+    } finally {
+      setLiveLoading(false)
+    }
+  }
+
   return <section id="explorer" className="section wrap">
-    <SectionHeading title="Molecular predictions"><p>Compare experimental solubility with saved predictions from each molecular view.</p></SectionHeading>
-    <div className="explorer-top"><span className="status-badge"><span />ESOL · {research.meta.sampleCount} test molecules</span><span className="subtle">Saved predictions · no live inference</span></div>
-    <div className="explorer-shell">
-      <aside className="explorer-sidebar" aria-label="Molecule selection">
-        <div className="sidebar-top"><div className="small-heading"><h3>Evaluation set</h3><span>{research.meta.sampleCount}</span></div><label className="search-label" htmlFor="molecule-search">Find a molecule</label><div className="search-field"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="m15 15 5 5" stroke="currentColor" strokeWidth="1.6" /></svg><input id="molecule-search" type="search" placeholder="Search SMILES or ESOL ID" value={query} onChange={e => { const text = e.target.value; setQuery(text); setStatus(''); const matches = matchingRecords(text); const active = matches.find(r => r.id === selectedId) ?? matches[0]; if (active) onSelected(active) }} /></div><p role="status" className="micro search-count">{filtered.length} {filtered.length === 1 ? 'match' : 'matches'} in the saved evaluation</p><p className="mini-label">Examples</p><div className="example-buttons">{research.examples.map(e => <button key={e.id} onClick={() => example(e.id)}>{e.label}<Arrow /></button>)}</div></div>
-        <div className="molecule-list" role="group" aria-label="Evaluated molecules">{filtered.map(record => <button key={record.id} aria-pressed={record.id === molecule?.id} className={`molecule-option ${record.id === molecule?.id ? 'selected' : ''}`} onClick={() => choose(record)}><span><strong>{label(record)}</strong><span>{record.atoms} atoms · {record.rings} rings</span></span></button>)}{!filtered.length && <p className="empty-sidebar">No saved molecules match this search.</p>}</div>
-        <button className="reset-button" onClick={reset}><Icon name="replay" />Reset explorer</button>
-      </aside>
-      <div className="explorer-detail" role="region" aria-label="Selected molecule results">
-        {!molecule ? <div className="empty-state"><Icon name="molecule" size={32} /><h3>Not present in this evaluation</h3><p>Search the {research.meta.sampleCount} saved ESOL molecules by SMILES or ID, or choose an example. This site does not run predictions for unseen molecules.</p><button className="button primary" onClick={reset}>Return to an example <Arrow /></button></div> : <>
-          <div className="molecule-heading"><div><p className="mini-label">Test observation / {String(molecule.ordinal).padStart(3, '0')}</p><h3>{label(molecule)} <span>Delaney ESOL</span></h3></div><button className="button compact secondary" onClick={download} aria-label="Download selected molecule result">Export result <Arrow down /></button></div>
-          <div className="molecule-stage"><div className="structure-panel"><div className="structure-toolbar"><span className="mini-label">Molecular structure</span><div className="structure-actions">{dimension === '2d' && <button className="assemble-btn" onClick={() => setReplayCount(c => c + 1)} title="Replay molecular assembly animation" aria-label="Replay molecular assembly animation"><Icon name="replay" /> Replay assembly</button>}<div className="segmented" role="group" aria-label="Structure display"><button aria-pressed={dimension === '2d'} onClick={() => setDimension('2d')}>2D</button><button aria-pressed={dimension === '3d'} onClick={() => setDimension('3d')}>3D</button></div></div></div>{dimension === '2d' ? <MolecularStructure2D key={molecule.id} structure={molecule.structure} name={label(molecule)} id={molecule.id} replayCount={replayCount} /> : <VisualBoundary key={`${molecule.id}-${replayCount}`}><Suspense fallback={<p className="viewer-loading" role="status">Loading conformer viewer…</p>}><ConformerViewer path={molecule.conformer} name={label(molecule)} /></Suspense></VisualBoundary>}<div className="structure-meta"><span>{molecule.atoms} heavy atoms</span><span>{molecule.rings} rings</span><span>{fmt(molecule.mass, 2)} g/mol</span></div></div><div className="observation-card"><p className="mini-label">Experimental log solubility</p><strong>{fmt(molecule.target)}</strong><span className="unit">log₁₀(mol/L)</span><div className="observed-divider" /><p className="mini-label">Fused prediction</p><span className="fused-value">{fmt(molecule.predictions.fused)}</span><span className="error-pill">Absolute error {fmt(absoluteError(molecule, 'fused'))}</span><p className="micro">Saved test observation.</p></div></div>
-          <div className="smiles-box"><div className="small-heading"><span className="mini-label">Source SMILES</span><button onClick={copySmiles} className="text-button" aria-label="Copy SMILES">Copy SMILES <Icon name="copy" /></button></div><code>{molecule.smiles}</code></div>
-          <div className="prediction-cards">{research.views.map(view => <div key={view.key} style={{ '--view-color': view.color } as CSSProperties}><p>{view.label}<span>{view.name}</span></p><strong>{fmt(molecule.predictions[view.key])}</strong><span className="micro">Abs. error {fmt(absoluteError(molecule, view.key))}</span></div>)}</div>
-          <PredictionComparison molecule={molecule} />
-          <Gating molecule={molecule} />
-        </>}
-        <p className="interaction-status" role="status">{status}</p>
+    <SectionHeading title="Molecular predictions">
+      <p>Compare experimental solubility with predictions from each molecular view or run live model inference.</p>
+    </SectionHeading>
+
+    <div className="explorer-top">
+      <div className="explorer-mode-switch" role="tablist" aria-label="Prediction mode selection">
+        <button
+          role="tab"
+          aria-selected={tab === 'atlas'}
+          aria-pressed={tab === 'atlas'}
+          onClick={() => setTab('atlas')}
+        >
+          <Icon name="molecule" size={16} /> Saved Atlas (113 ESOL)
+        </button>
+        <button
+          role="tab"
+          aria-selected={tab === 'live'}
+          aria-pressed={tab === 'live'}
+          onClick={() => {
+            setTab('live')
+            if (!liveResult && !liveLoading) void runLiveInference()
+          }}
+        >
+          <Icon name="sparkles" size={16} /> Live AWS Model Inference
+        </button>
+      </div>
+
+      <div style={{ marginLeft: 'auto' }}>
+        {tab === 'atlas' ? (
+          <span className="subtle">Saved predictions · 113 benchmark molecules</span>
+        ) : (
+          <span className={`live-backend-badge ${backendHealth?.healthy ? 'connected' : 'fallback'}`}>
+            <i /> {backendHealth?.healthy ? (backendHealth.s3Bucket ? `AWS S3: ${backendHealth.s3Bucket}` : 'AWS Backend Ready') : 'Multi-View Fallback Engine'}
+          </span>
+        )}
       </div>
     </div>
+
+    {tab === 'atlas' ? (
+      <div className="explorer-shell">
+        <aside className="explorer-sidebar" aria-label="Molecule selection">
+          <div className="sidebar-top">
+            <div className="small-heading"><h3>Evaluation set</h3><span>{research.meta.sampleCount}</span></div>
+            <label className="search-label" htmlFor="molecule-search">Find a molecule</label>
+            <div className="search-field">
+              <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="m15 15 5 5" stroke="currentColor" strokeWidth="1.6" /></svg>
+              <input id="molecule-search" type="search" placeholder="Search SMILES or ESOL ID" value={query} onChange={e => { const text = e.target.value; setQuery(text); setStatus(''); const matches = matchingRecords(text); const active = matches.find(r => r.id === selectedId) ?? matches[0]; if (active) onSelected(active) }} />
+            </div>
+            <p role="status" className="micro search-count">{filtered.length} {filtered.length === 1 ? 'match' : 'matches'} in the saved evaluation</p>
+            <p className="mini-label">Examples</p>
+            <div className="example-buttons">{research.examples.map(e => <button key={e.id} onClick={() => example(e.id)}>{e.label}<Arrow /></button>)}</div>
+          </div>
+          <div className="molecule-list" role="group" aria-label="Evaluated molecules">{filtered.map(record => <button key={record.id} aria-pressed={record.id === molecule?.id} className={`molecule-option ${record.id === molecule?.id ? 'selected' : ''}`} onClick={() => choose(record)}><span><strong>{label(record)}</strong><span>{record.atoms} atoms · {record.rings} rings</span></span></button>)}{!filtered.length && <p className="empty-sidebar">No saved molecules match this search.</p>}</div>
+          <button className="reset-button" onClick={reset}><Icon name="replay" />Reset explorer</button>
+        </aside>
+
+        <div className="explorer-detail" role="region" aria-label="Selected molecule results">
+          {!molecule ? (
+            <div className="empty-state">
+              <Icon name="molecule" size={32} />
+              <h3>Not in saved evaluation</h3>
+              <p>"{query}" is not among the 113 Delaney ESOL benchmark molecules.</p>
+              <button
+                className="button primary"
+                style={{ marginTop: 12 }}
+                onClick={() => {
+                  setLiveSmiles(query)
+                  setTab('live')
+                  void runLiveInference(query)
+                }}
+              >
+                <Icon name="sparkles" size={16} /> Predict with Live Model <Arrow />
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="molecule-heading">
+                <div><p className="mini-label">Test observation / {String(molecule.ordinal).padStart(3, '0')}</p><h3>{label(molecule)} <span>Delaney ESOL</span></h3></div>
+                <button className="button compact secondary" onClick={() => download()} aria-label="Download selected molecule result">Export result <Arrow down /></button>
+              </div>
+              <div className="molecule-stage">
+                <div className="structure-panel">
+                  <div className="structure-toolbar">
+                    <span className="mini-label">Molecular structure</span>
+                    <div className="structure-actions">
+                      {dimension === '2d' && <button className="assemble-btn" onClick={() => setReplayCount(c => c + 1)} title="Replay molecular assembly animation" aria-label="Replay molecular assembly animation"><Icon name="replay" /> Replay assembly</button>}
+                      <div className="segmented" role="group" aria-label="Structure display">
+                        <button aria-pressed={dimension === '2d'} onClick={() => setDimension('2d')}>2D</button>
+                        <button aria-pressed={dimension === '3d'} onClick={() => setDimension('3d')}>3D</button>
+                      </div>
+                    </div>
+                  </div>
+                  {dimension === '2d' ? (
+                    <MolecularStructure2D key={molecule.id} structure={molecule.structure} name={label(molecule)} id={molecule.id} replayCount={replayCount} />
+                  ) : (
+                    <VisualBoundary key={`${molecule.id}-${replayCount}`}>
+                      <Suspense fallback={<p className="viewer-loading" role="status">Loading conformer viewer…</p>}>
+                        <ConformerViewer path={molecule.conformer} name={label(molecule)} />
+                      </Suspense>
+                    </VisualBoundary>
+                  )}
+                  <div className="structure-meta"><span>{molecule.atoms} heavy atoms</span><span>{molecule.rings} rings</span><span>{fmt(molecule.mass, 2)} g/mol</span></div>
+                </div>
+                <div className="observation-card">
+                  <p className="mini-label">Experimental log solubility</p>
+                  <strong>{fmt(molecule.target)}</strong>
+                  <span className="unit">log₁₀(mol/L)</span>
+                  <div className="observed-divider" />
+                  <p className="mini-label">Fused prediction</p>
+                  <span className="fused-value">{fmt(molecule.predictions.fused)}</span>
+                  <span className="error-pill">Absolute error {fmt(absoluteError(molecule, 'fused'))}</span>
+                  <p className="micro">Saved test observation.</p>
+                </div>
+              </div>
+              <div className="smiles-box">
+                <div className="small-heading"><span className="mini-label">Source SMILES</span><button onClick={() => copySmiles()} className="text-button" aria-label="Copy SMILES">Copy SMILES <Icon name="copy" /></button></div>
+                <code>{molecule.smiles}</code>
+              </div>
+              <div className="prediction-cards">
+                {research.views.map(view => (
+                  <div key={view.key} style={{ '--view-color': view.color } as CSSProperties}>
+                    <p>{view.label}<span>{view.name}</span></p>
+                    <strong>{fmt(molecule.predictions[view.key])}</strong>
+                    <span className="micro">Abs. error {fmt(absoluteError(molecule, view.key))}</span>
+                  </div>
+                ))}
+              </div>
+              <PredictionComparison molecule={molecule} />
+              <Gating molecule={molecule} />
+            </>
+          )}
+          <p className="interaction-status" role="status">{status}</p>
+        </div>
+      </div>
+    ) : (
+      /* Live Inference View */
+      <div className="explorer-shell">
+        <aside className="explorer-sidebar" aria-label="Live model input">
+          <div className="sidebar-top">
+            <div className="small-heading"><h3>Custom SMILES</h3><span>Live Model</span></div>
+            <p className="micro" style={{ margin: '4px 0 12px' }}>Enter any chemical structure in SMILES format to predict its aqueous solubility.</p>
+            <div className="live-input-container">
+              <label className="search-label" htmlFor="live-smiles-input">SMILES String</label>
+              <div className="live-input-row">
+                <input
+                  id="live-smiles-input"
+                  type="text"
+                  className="live-smiles-input"
+                  value={liveSmiles}
+                  placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O"
+                  onChange={e => setLiveSmiles(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') void runLiveInference() }}
+                />
+              </div>
+              <button
+                className="live-predict-btn"
+                disabled={liveLoading || !liveSmiles.trim()}
+                onClick={() => void runLiveInference()}
+              >
+                <Icon name="sparkles" size={16} /> {liveLoading ? 'Running Model...' : 'Predict Solubility'}
+              </button>
+            </div>
+
+            <p className="mini-label">Quick test molecules</p>
+            <div className="live-samples">
+              {quickSamples.map(sample => (
+                <button
+                  key={sample.name}
+                  className="live-sample-chip"
+                  onClick={() => {
+                    setLiveSmiles(sample.smiles)
+                    void runLiveInference(sample.smiles)
+                  }}
+                >
+                  {sample.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button className="reset-button" onClick={() => { setLiveSmiles('CC(=O)Oc1ccccc1C(=O)O'); void runLiveInference('CC(=O)Oc1ccccc1C(=O)O') }}>
+            <Icon name="replay" /> Reset to Aspirin
+          </button>
+        </aside>
+
+        <div className="explorer-detail" role="region" aria-label="Live inference results">
+          {liveError && <div className="live-error-box" role="alert">{liveError}</div>}
+
+          {liveLoading ? (
+            <div className="empty-live-state">
+              <Icon name="molecule" size={36} />
+              <h3>Calculating TriBioNode Representations…</h3>
+              <p>Encoding 1D sequence tokens, 2D atom-motif graphs, and 3D spatial conformer features.</p>
+            </div>
+          ) : liveResult ? (
+            <>
+              <div className="live-source-banner">
+                <span>Model Engine: <strong>{liveResult.modelSource}</strong></span>
+                {liveResult.isFallback && <span>(Set <code>VITE_API_ENDPOINT</code> in <code>.env</code> to connect live AWS endpoint)</span>}
+              </div>
+
+              <div className="molecule-heading">
+                <div>
+                  <p className="mini-label">Live Inference Observation</p>
+                  <h3>Custom Molecule <span>Predicted log₁₀(S)</span></h3>
+                </div>
+                <button
+                  className="button compact secondary"
+                  onClick={() => {
+                    const customMolecule: Molecule = {
+                      id: 'custom-live',
+                      ordinal: 0,
+                      smiles: liveResult.smiles,
+                      canonicalSmiles: liveResult.canonicalSmiles,
+                      target: liveResult.predictions.fused,
+                      predictions: liveResult.predictions,
+                      gates: liveResult.gates,
+                      structure: liveResult.structureSvg || '',
+                      conformer: null,
+                      atoms: liveResult.metrics.atoms,
+                      rings: liveResult.metrics.rings,
+                      mass: liveResult.metrics.mass,
+                    }
+                    download(customMolecule)
+                  }}
+                  aria-label="Download live prediction result"
+                >
+                  Export result <Arrow down />
+                </button>
+              </div>
+
+              <div className="molecule-stage">
+                <div className="structure-panel">
+                  <div className="structure-toolbar">
+                    <span className="mini-label">Molecular structure</span>
+                    <div className="structure-actions">
+                      <div className="segmented" role="group" aria-label="Structure display">
+                        <button aria-pressed={dimension === '2d'} onClick={() => setDimension('2d')}>2D</button>
+                        <button aria-pressed={dimension === '3d'} onClick={() => setDimension('3d')}>3D</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {dimension === '2d' && liveResult.structureSvg ? (
+                    <MolecularStructure2D
+                      key={liveResult.canonicalSmiles}
+                      structure={liveResult.structureSvg}
+                      name="Custom Molecule"
+                      id="custom-live"
+                    />
+                  ) : dimension === '3d' && liveResult.conformer ? (
+                    <VisualBoundary key={`live-conformer-${liveResult.canonicalSmiles}`}>
+                      <Suspense fallback={<p className="viewer-loading" role="status">Loading conformer viewer…</p>}>
+                        <ConformerViewer directGeometry={liveResult.conformer as Geometry} name="Custom Molecule" />
+                      </Suspense>
+                    </VisualBoundary>
+                  ) : (
+                    <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--text-2)' }}>
+                      <p>RDKit 2D/3D structure generated dynamically on server.</p>
+                      <code>{liveResult.canonicalSmiles}</code>
+                    </div>
+                  )}
+
+                  <div className="structure-meta">
+                    <span>{liveResult.metrics.atoms} heavy atoms</span>
+                    <span>{liveResult.metrics.rings} rings</span>
+                    <span>{fmt(liveResult.metrics.mass, 2)} g/mol</span>
+                    {liveResult.metrics.logP !== undefined && <span>LogP: {liveResult.metrics.logP}</span>}
+                  </div>
+                </div>
+
+                {(() => {
+                  const dominant = getDominantView(liveResult.gates)
+                  const dominantKey = (dominant.index === 0 ? 'view1' : dominant.index === 1 ? 'view2' : 'view3') as keyof typeof liveResult.predictions
+                  const dominantPred = liveResult.predictions[dominantKey] ?? liveResult.predictions.fused
+                  const delta = Math.abs(liveResult.predictions.fused - dominantPred)
+                  const usp = getUspSolubilityClass(liveResult.predictions.fused)
+                  const conc = getFormattedConcentration(liveResult.predictions.fused, liveResult.metrics.mass)
+
+                  return (
+                    <div className="observation-card">
+                      <p className="mini-label">Fused Prediction (TriBioNode)</p>
+                      <strong>{fmt(liveResult.predictions.fused)}</strong>
+                      <span className="unit">log₁₀(mol/L) · Consensus</span>
+                      <div className="observed-divider" />
+                      <p className="mini-label">Dominant View ({dominant.name})</p>
+                      <span className="fused-value">{fmt(dominantPred)}</span>
+                      <span className="error-pill">
+                        Δ Concordance {fmt(delta, 3)} log₁₀(mol/L)
+                      </span>
+                      <p className="micro">{usp.label} · Est. ~{conc.formattedMass} ({conc.formattedMolar})</p>
+                    </div>
+                  )
+                })()}
+              </div>
+
+              <div className="smiles-box">
+                <div className="small-heading">
+                  <span className="mini-label">Input SMILES</span>
+                  <button onClick={() => copySmiles(liveResult.smiles)} className="text-button" aria-label="Copy SMILES">
+                    Copy SMILES <Icon name="copy" />
+                  </button>
+                </div>
+                <code>{liveResult.smiles}</code>
+              </div>
+
+              <div className="prediction-cards">
+                {research.views.map((view, i) => (
+                  <div key={view.key} style={{ '--view-color': view.color } as CSSProperties}>
+                    <p>{view.label}<span>{view.name}</span></p>
+                    <strong>{fmt(liveResult.predictions[view.key])}</strong>
+                    <span className="micro">
+                      {i < 3 ? `Gate: ${(liveResult.gates[i] * 100).toFixed(1)}%` : 'Final fused output'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="gating">
+                <div className="small-heading"><h4>View allocation</h4><span>Gating weights</span></div>
+                <div className="gate-track" role="img" aria-label={research.views.slice(0, 3).map((v, i) => `${v.label}: ${fmt(liveResult.gates[i] * 100, 2)} percent`).join(', ')}>
+                  {research.views.slice(0, 3).map((view, i) => (
+                    <span key={view.key} style={{ width: `${(liveResult.gates[i] || 0) * 100}%`, background: view.color }} />
+                  ))}
+                </div>
+                <div className="gate-labels">
+                  {research.views.slice(0, 3).map((view, i) => (
+                    <span key={view.key}><i style={{ background: view.color }} />{view.label}<strong>{fmt((liveResult.gates[i] || 0) * 100, 2)}%</strong></span>
+                  ))}
+                </div>
+                <p className="micro">Gating weights describe multi-view routing allocations for this custom molecule.</p>
+              </div>
+            </>
+          ) : (
+            <div className="empty-live-state">
+              <Icon name="sparkles" size={36} />
+              <h3>Ready for Live Inference</h3>
+              <p>Type any molecule SMILES string on the left or select a sample to run predictions through the TriBioNode model.</p>
+            </div>
+          )}
+          <p className="interaction-status" role="status">{status}</p>
+        </div>
+      </div>
+    )}
   </section>
 }
 
