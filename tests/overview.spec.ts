@@ -82,6 +82,14 @@ test('reduced motion and offscreen visibility pause playback', async ({ page }) 
   await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).paused)).toBe(true)
   await page.getByRole('link', { name: 'TriBioNode home' }).first().click()
   await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).paused)).toBe(false)
+  // A sliver of the video should not keep decoding while reading the next section.
+  await video.evaluate(element => {
+    const box = element.getBoundingClientRect()
+    window.scrollBy(0, box.bottom - box.height * .1)
+  })
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).paused)).toBe(true)
+  await page.getByRole('link', { name: 'TriBioNode home' }).first().click()
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).paused)).toBe(false)
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await expect(page.getByRole('button', { name: 'Play animation' })).toBeVisible()
@@ -115,4 +123,53 @@ test('unavailable video offers retry and preserves the research website', async 
   await expect.poll(() => page.locator('.architecture-video').evaluate(element => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(.1)
   await page.getByRole('navigation').getByRole('link', { name: 'Molecules', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Selected molecule results' })).toBeVisible()
+})
+
+test('film scrubbing preserves play intent and the final prediction stays on screen', async ({ page }) => {
+  await page.goto('/')
+  const video = page.locator('.architecture-video')
+  const progress = page.getByRole('slider', { name: 'Architecture film progress' })
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).readyState)).toBeGreaterThan(1)
+  expect(await video.evaluate(element => (element as HTMLVideoElement).loop)).toBe(false)
+  const box = await progress.boundingBox()
+  await page.mouse.move(box!.x + box!.width * .5, box!.y + box!.height / 2)
+  await page.mouse.down()
+  await progress.fill('23')
+  await page.mouse.up()
+  await expect(page.getByRole('button', { name: 'Play animation', exact: true })).toBeVisible()
+  await expect(progress).toHaveAttribute('aria-valuetext', /Parallel gating/)
+  await page.getByRole('button', { name: 'Play animation', exact: true }).click()
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).paused)).toBe(false)
+  await page.mouse.move(box!.x + box!.width * .6, box!.y + box!.height / 2)
+  await page.mouse.down()
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).paused)).toBe(true)
+  await page.mouse.up()
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).paused)).toBe(false)
+  await progress.fill('43.5')
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).ended)).toBe(true)
+  await expect(page.getByRole('button', { name: 'Play animation', exact: true })).toBeVisible()
+  await expect(page.locator('#overview [role="status"]')).toContainText('Saved solubility prediction')
+  const visibleInk = await video.evaluate(element => {
+    const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 180
+    const context = canvas.getContext('2d')!
+    context.drawImage(element as HTMLVideoElement, 0, 0, 320, 180)
+    const pixels = context.getImageData(0, 0, 320, 180).data
+    let ink = 0
+    for (let i = 0; i < pixels.length; i += 4) if (pixels[i] < 150 && pixels[i + 1] < 170 && pixels[i + 2] < 190) ink++
+    return ink
+  })
+  expect(visibleInk).toBeGreaterThan(200)
+  await page.screenshot({ path: 'artifacts/skill-motion-overview-final-frame.png' })
+})
+
+test('a seek requested during loading is preserved when the film becomes ready', async ({ page }) => {
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/animation/*.mp4', async route => { await gate; await route.continue() })
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await page.getByRole('slider', { name: 'Architecture film progress' }).fill('23')
+  release()
+  const video = page.locator('.architecture-video')
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).readyState)).toBeGreaterThan(1)
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).currentTime)).toBeCloseTo(23, 1)
 })

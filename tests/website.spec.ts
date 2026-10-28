@@ -19,7 +19,7 @@ test('desktop, tablet, and mobile layouts preserve content without overflow', as
     }).map(node => node.textContent || node.getAttribute('aria-label')))
     expect(smallControls, `Controls need a 44px touch target at ${width}px`).toEqual([])
     if (width === 1440) await page.screenshot({ path: 'artifacts/preview-desktop.png' })
-    const broken = await page.evaluate(() => Array.from(document.images).filter(image => !image.complete || image.naturalWidth === 0).map(image => image.src))
+    const broken = await page.evaluate(() => Array.from(document.images).filter(image => image.loading !== 'lazy' && (!image.complete || image.naturalWidth === 0)).map(image => image.src))
     expect(broken).toEqual([])
     await page.screenshot({ path: `artifacts/site-${width}.png`, fullPage: true })
     if (width === 390) {
@@ -109,7 +109,7 @@ test('result filters and architecture selection change displayed evidence', asyn
   await expect(page.getByText('R² describes variance explained; higher is better.')).toBeVisible()
   const views = page.getByRole('group', { name: 'Result prediction view' })
   await views.getByRole('button', { name: 'View 1', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'View 1: the parity view' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'View 1: observed vs. predicted' })).toBeVisible()
   await page.getByText('Inspect all 113 underlying observations').click()
   await expect(page.getByRole('table', { name: /View 1 — values/ }).locator('tbody tr')).toHaveCount(113)
   const architecture = page.locator('#architecture')

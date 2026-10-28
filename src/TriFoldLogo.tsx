@@ -1,3 +1,4 @@
+import Icon from './Icon'
 import { useEffect, useRef, useState } from 'react'
 import { asset } from './research'
 
@@ -34,6 +35,6 @@ export default function TriFoldLogo({ paused, setPaused }: { paused: boolean; se
         <source src={asset('brand/trifold-3d.mp4')} type="video/mp4" onError={() => setFailed(true)} />
       </video>}
     </div>
-    <button className="trifold-motion" type="button" aria-pressed={paused} aria-label={paused ? 'Play logo animation' : 'Pause logo animation'} onClick={() => setPaused(!paused)}><span aria-hidden="true">{paused ? '▶' : 'Ⅱ'}</span>{paused ? 'Play animation' : 'Pause animation'}</button>
+    <button className="trifold-motion" type="button" aria-pressed={paused} aria-label={paused ? 'Play logo animation' : 'Pause logo animation'} onClick={() => setPaused(!paused)}><Icon name={paused ? "play" : "pause"} />{paused ? 'Play animation' : 'Pause animation'}</button>
   </div>
 }

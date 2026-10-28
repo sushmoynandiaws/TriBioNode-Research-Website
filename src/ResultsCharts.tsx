@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { absoluteError, asset, fmt, label, research } from "./research";
 import type { MetricKey, ViewKey } from "./research";
+import Icon from "./Icon";
 
 type FigureCategory =
   | "All"
@@ -18,118 +19,90 @@ type FigureItem = {
   category: FigureCategory;
   image: string;
   caption: string;
-  takeaway: string;
 };
 
 const thesisFigures: FigureItem[] = [
   {
-    id: "fig-12",
-    number: "Figure 7",
-    badge: "Empirical Benchmark",
-    title: "Multi-Modal Comparative Performance Analysis",
-    category: "Performance",
-    image: "figures/12_multiview_comparative_performance.png",
-    caption:
-      "Comparative evaluation across ESOL, FreeSolv, and Lipophilicity benchmarks showing TriBioNode multi-modal fusion outperforming individual 1D, 2D, and 3D unimodal baselines.",
-    takeaway:
-      "Multi-view fusion reduces test RMSE and variance compared to any single modality.",
+    "id": "fig-12",
+    "number": "Source figure 1",
+    "badge": "Performance",
+    "title": "Benchmark comparison",
+    "category": "Performance",
+    "image": "figures/12_multiview_comparative_performance.png",
+    "caption": "Source ESOL diagnostics: parity, error density, error-tolerance curves and residual structure."
   },
   {
-    id: "fig-10",
-    number: "Figure 10",
-    badge: "Uncertainty Estimation",
-    title: "Parity Plot with Epistemic Uncertainty",
-    category: "Performance",
-    image: "figures/10_parity_plot_with_epistemic_uncertainty.png",
-    caption:
-      "Predicted versus experimental aqueous solubility across the evaluation set, complete with 95% epistemic confidence bounds and residual distributions.",
-    takeaway:
-      "Tight alignment around the identity diagonal with calibrated epistemic uncertainty.",
+    "id": "fig-10",
+    "number": "Source figure 2",
+    "badge": "Performance",
+    "title": "Parity and uncertainty",
+    "category": "Performance",
+    "image": "figures/10_parity_plot_with_epistemic_uncertainty.png",
+    "caption": "Source parity and uncertainty plot. Interval calibration has not been verified."
   },
   {
-    id: "fig-09",
-    number: "Figure 10a",
-    badge: "Dynamic Attention",
-    title: "Dynamic Attention View Gating Allocation",
-    category: "Gating & Attention",
-    image: "figures/09_dynamic_view_gating_allocation.png",
-    caption:
-      "Ternary routing simplex showing adaptive weighting distribution between 1D SMILES, 2D Graph motifs, and 3D Conformer spatial representations.",
-    takeaway:
-      "Adaptive gating routes molecular features dynamically rather than using static averaging.",
+    "id": "fig-09",
+    "number": "Source figure 3",
+    "badge": "Gating & Attention",
+    "title": "View allocation",
+    "category": "Gating & Attention",
+    "image": "figures/09_dynamic_view_gating_allocation.png",
+    "caption": "Source visualization of allocation across sequence, structure and geometry views."
   },
   {
-    id: "fig-14",
-    number: "Figure 10b",
-    badge: "Mechanistic Routing",
-    title: "Mechanistic Analysis of Dynamic Gating",
-    category: "Gating & Attention",
-    image: "figures/14_dynamic_gating_mechanistic_analysis.png",
-    caption:
-      "Correlations between chemical complexity descriptors (rotatable bonds, aromatic rings, molecular flexibility) and learned representation weights.",
-    takeaway:
-      "High-flexibility conformers steer gating toward 3D features, while rigid conjugated molecules rely more on graph motifs.",
+    "id": "fig-14",
+    "number": "Source figure 4",
+    "badge": "Gating & Attention",
+    "title": "Molecular descriptors and routing",
+    "category": "Gating & Attention",
+    "image": "figures/14_dynamic_gating_mechanistic_analysis.png",
+    "caption": "Source plot relating molecular descriptors to representation weights."
   },
   {
-    id: "fig-13",
-    number: "Figure 8",
-    badge: "Latent Manifold",
-    title: "Multi-View Latent Manifold Topology via t-SNE",
-    category: "Latent Topology",
-    image: "figures/13_multiview_latent_manifold_tsne.png",
-    caption:
-      "High-dimensional latent embedding clustering comparing individual view representations against the unified cross-modal fused manifold.",
-    takeaway:
-      "Fused latent space achieves superior clustering and separation of physicochemical property regimes.",
+    "id": "fig-13",
+    "number": "Source figure 5",
+    "badge": "Latent Topology",
+    "title": "Embedding projections",
+    "category": "Latent Topology",
+    "image": "figures/13_multiview_latent_manifold_tsne.png",
+    "caption": "Source projection of molecular embeddings; clustering quality is not established."
   },
   {
-    id: "fig-15",
-    number: "Figure 11",
-    badge: "Synergy Matrix",
-    title: "Cross-Modal Complementarity & Synergistic Correction",
-    category: "Gating & Attention",
-    image: "figures/15_cross_modal_complementarity_and_synergy.png",
-    caption:
-      "Empirical error correction analysis demonstrating how cross-modal attention compensates when individual unimodal encoders make divergent predictions.",
-    takeaway:
-      "Orthogonal error profiles between views enable the fused head to recover accurate targets.",
+    "id": "fig-15",
+    "number": "Source figure 6",
+    "badge": "Gating & Attention",
+    "title": "Cross-view complementarity",
+    "category": "Gating & Attention",
+    "image": "figures/15_cross_modal_complementarity_and_synergy.png",
+    "caption": "Source illustration of prediction differences and cross-view complementarity."
   },
   {
-    id: "fig-11",
-    number: "Figure 9",
-    badge: "Ablation Study",
-    title: "Systematic Architectural Ablation Study",
-    category: "Ablations",
-    image: "figures/11_systematic_architecture_ablation.png",
-    caption:
-      "Component-wise ablation isolating the empirical impact of BRICS motif pooling, RBF spatial encodings, and cross-attention gating layers.",
-    takeaway:
-      "Every architectural component provides statistically significant error reduction.",
+    "id": "fig-11",
+    "number": "Source figure 7",
+    "badge": "Ablations",
+    "title": "Component ablations",
+    "category": "Ablations",
+    "image": "figures/11_systematic_architecture_ablation.png",
+    "caption": "Proposed component ablations; statistical significance has not been established."
   },
   {
-    id: "fig-07",
-    number: "Figure 6",
-    badge: "Residual Matrix",
-    title: "Multi-View Complementarity Matrix",
-    category: "Performance",
-    image: "figures/07_multiview_complementarity_matrix.png",
-    caption:
-      "Pairwise Pearson and Spearman correlation matrices of prediction residuals across Delaney ESOL test molecules.",
-    takeaway:
-      "Low inter-view residual correlation confirms that the three representation encoders capture complementary molecular information.",
+    "id": "fig-07",
+    "number": "Source figure 8",
+    "badge": "Performance",
+    "title": "Residual correlations",
+    "category": "Performance",
+    "image": "figures/07_multiview_complementarity_matrix.png",
+    "caption": "Source correlation matrices for molecular prediction residuals."
   },
   {
-    id: "fig-fusion",
-    number: "Mechanism",
-    badge: "Cross-Modal Fusion",
-    title: "Dynamic Gating & Multi-View Synergy",
-    category: "Representations",
-    image: "figures/view_fusion_dynamic_gating_synergy.png",
-    caption:
-      "Architectural schematic of the parallel gating network and cross-modal attention fusion layer.",
-    takeaway:
-      "Jointly balances sequence tokens, molecular graph subgraphs, and spatial 3D distances.",
-  },
+    "id": "fig-fusion",
+    "number": "Source figure 9",
+    "badge": "Representations",
+    "title": "Gating and fusion schematic",
+    "category": "Representations",
+    "image": "figures/view_fusion_dynamic_gating_synergy.png",
+    "caption": "Source schematic of view gating and cross-modal fusion."
+  }
 ];
 
 const categories: FigureCategory[] = [
@@ -147,14 +120,18 @@ export default function ResultsCharts() {
   const [activeCategory, setActiveCategory] = useState<FigureCategory>("All");
   const [modalFigure, setModalFigure] = useState<FigureItem | null>(null);
 
-  // Close modal on Escape key
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const figureTrigger = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setModalFigure(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+    if (!modalFigure || !dialogRef.current) return;
+    const dialog = dialogRef.current;
+    const trigger = figureTrigger.current;
+    const overflow = document.body.style.overflow;
+    dialog.showModal();
+    dialog.querySelector<HTMLButtonElement>('.figure-modal-close')?.focus();
+    document.body.style.overflow = 'hidden';
+    return () => { dialog.close(); document.body.style.overflow = overflow; trigger?.focus(); };
+  }, [modalFigure]);
 
   const view = research.views.find((v) => v.key === selected)!;
   const maxMetric =
@@ -192,7 +169,7 @@ export default function ResultsCharts() {
           <div className="chart-heading">
             <div>
               <p className="mini-label">Prediction head comparison</p>
-              <h3>The value of bringing views together</h3>
+              <h3>Prediction head performance</h3>
             </div>
             <label className="metric-select">
               Metric
@@ -201,9 +178,9 @@ export default function ResultsCharts() {
                 value={metric}
                 onChange={(e) => setMetric(e.target.value as MetricKey)}
               >
-                <option value="RMSE">RMSE ↓</option>
-                <option value="MAE">MAE ↓</option>
-                <option value="R2">R² ↑</option>
+                <option value="RMSE">RMSE</option>
+                <option value="MAE">MAE</option>
+                <option value="R2">R²</option>
               </select>
             </label>
           </div>
@@ -248,7 +225,7 @@ export default function ResultsCharts() {
 
         <article className="chart-card mean-gating">
           <p className="mini-label">Mean routing allocation</p>
-          <h3>Where the gate puts its weight</h3>
+          <h3>Mean view allocation</h3>
           <div
             className="mean-gate-number"
             style={{ color: research.views[2].color }}
@@ -325,19 +302,19 @@ export default function ResultsCharts() {
           <div className="chart-heading">
             <div>
               <p className="mini-label">Observed vs. predicted</p>
-              <h3>{view.label}: the parity view</h3>
+              <h3>{view.label}: observed vs. predicted</h3>
             </div>
             <span className="chart-metric" style={{ color: view.color }}>
               R² {fmt(view.metrics.R2, 3)}
             </span>
           </div>
-          <svg
+          <div className="parity-chart-scroll" role="region" tabIndex={0} aria-label="Observed versus predicted chart; scroll horizontally to inspect"><svg
             className="parity-plot"
             viewBox="0 0 500 362"
             role="img"
             aria-label={`${view.label} predicted versus experimental log solubility for 113 molecules. The dashed identity line shows perfect agreement.`}
           >
-            <text x="60" y="19" fill="var(--text-2)" fontSize="11">
+            <text x="60" y="19" fill="var(--text-2)" fontSize="13">
               Predicted log₁₀(mol/L)
             </text>
             {ticks.map((t) => (
@@ -360,7 +337,7 @@ export default function ResultsCharts() {
                   x="48"
                   y={y(t) + 4}
                   textAnchor="end"
-                  fontSize="11"
+                  fontSize="13"
                   fill="var(--text-2)"
                 >
                   {fmt(t, 1)}
@@ -369,7 +346,7 @@ export default function ResultsCharts() {
                   x={x(t)}
                   y="326"
                   textAnchor="middle"
-                  fontSize="11"
+                  fontSize="13"
                   fill="var(--text-2)"
                 >
                   {fmt(t, 1)}
@@ -408,21 +385,21 @@ export default function ResultsCharts() {
               y="354"
               textAnchor="middle"
               fill="var(--text-2)"
-              fontSize="11"
+              fontSize="13"
             >
               Experimental log₁₀(mol/L)
             </text>
-          </svg>
+          </svg></div><p className="chart-scroll-hint">Scroll horizontally to inspect the chart.</p>
           <div className="plot-legend">
             <i style={{ background: view.color }} />
             {research.meta.sampleCount} test observations{" "}
-            <span>┄ Perfect agreement (y = x)</span>
+            <span>Identity line (y = x)</span>
           </div>
         </article>
 
         <article className="chart-card error-card">
           <p className="mini-label">Absolute error distribution</p>
-          <h3>How far do predictions miss?</h3>
+          <h3>Absolute prediction error</h3>
           <p className="chart-explanation">
             {view.label} · Counts by absolute error in log₁₀(mol/L).
           </p>
@@ -479,9 +456,9 @@ export default function ResultsCharts() {
           <thead>
             <tr>
               <th scope="col">Prediction head</th>
-              <th scope="col">RMSE ↓</th>
-              <th scope="col">MAE ↓</th>
-              <th scope="col">R² ↑</th>
+              <th scope="col">RMSE</th>
+              <th scope="col">MAE</th>
+              <th scope="col">R²</th>
               <th scope="col">Mean gate</th>
             </tr>
           </thead>
@@ -511,7 +488,7 @@ export default function ResultsCharts() {
       <details className="observation-table">
         <summary>
           Inspect all {research.meta.sampleCount} underlying observations{" "}
-          <span aria-hidden="true">＋</span>
+          <Icon name="plus" />
         </summary>
         <div
           className="observation-scroll"
@@ -545,28 +522,15 @@ export default function ResultsCharts() {
         </div>
       </details>
 
-      {/* Real Thesis Research Figures Section */}
+
       <section
         className="thesis-figures-panel"
-        aria-label="Empirical research figures from the thesis"
+        aria-label="Source manuscript figures"
       >
         <div className="figures-header">
           <div>
-            <div className="figures-header-badge">
-              <span className="status-badge">
-                <span />
-                Real Manuscript Artifacts
-              </span>
-              <span className="figures-count-pill">
-                {thesisFigures.length} empirical figures
-              </span>
-            </div>
-            <h3>Thesis research figures & empirical evidence</h3>
-            <p>
-              Original high-resolution experimental plots generated from the
-              research codebase and published in the TriBioNode evaluation
-              manuscript.
-            </p>
+            <h3>Source manuscript figures</h3>
+            <p>Original manuscript graphics for context. Additional benchmark, uncertainty and ablation claims are not validated by the saved ESOL evaluation above.</p>
           </div>
           <div
             className="figure-category-chips"
@@ -598,11 +562,12 @@ export default function ResultsCharts() {
               className="figure-card"
               tabIndex={0}
               role="button"
-              aria-label={`${fig.number}: ${fig.title}. Click to view full resolution.`}
-              onClick={() => setModalFigure(fig)}
+              aria-label={`${fig.number}: ${fig.title}. Open full-resolution figure.`}
+              onClick={event => { figureTrigger.current = event.currentTarget; setModalFigure(fig); }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
+                  figureTrigger.current = e.currentTarget;
                   setModalFigure(fig);
                 }
               }}
@@ -612,24 +577,17 @@ export default function ResultsCharts() {
                   src={asset(fig.image)}
                   alt={`${fig.number}: ${fig.title}`}
                   loading="lazy"
+                  decoding="async"
                   width="720"
                   height="420"
                 />
-                <div className="figure-card-overlay">
-                  <span className="inspect-pill">
-                    <span aria-hidden="true">🔍</span> Inspect full resolution
-                  </span>
-                </div>
               </div>
               <div className="figure-card-body">
                 <div className="figure-card-meta">
                   <span className="figure-badge">{fig.number}</span>
-                  <span className="figure-tag">{fig.badge}</span>
+                  <span className="figure-tag">{fig.badge}</span><Icon name="expand" />
                 </div>
                 <h4>{fig.title}</h4>
-                <p className="figure-takeaway">
-                  <strong>Key evidence:</strong> {fig.takeaway}
-                </p>
                 <p className="micro figure-caption">{fig.caption}</p>
               </div>
             </article>
@@ -637,11 +595,20 @@ export default function ResultsCharts() {
         </div>
       </section>
 
-      {/* Lightbox Modal for High-Resolution Figure Inspection */}
+
       {modalFigure && (
-        <div
+        <dialog
+          ref={dialogRef}
           className="figure-modal-backdrop"
-          onClick={() => setModalFigure(null)}
+          onCancel={() => setModalFigure(null)}
+          onClick={event => { if(event.target === event.currentTarget) setModalFigure(null) }}
+          onKeyDown={event => {
+            if (event.key !== 'Tab') return;
+            const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button, a[href]')];
+            const current = controls.indexOf(document.activeElement as HTMLElement);
+            const target = controls[(current + (event.shiftKey ? -1 : 1) + controls.length) % controls.length];
+            if (target) { event.preventDefault(); target.focus(); }
+          }}
           role="dialog"
           aria-modal="true"
           aria-label={modalFigure.title}
@@ -658,37 +625,25 @@ export default function ResultsCharts() {
                 </div>
                 <h3>{modalFigure.title}</h3>
               </div>
-              <button
+              <div className="figure-modal-actions"><a className="figure-modal-download" aria-label="Download image" title="Download image" href={asset(modalFigure.image)} download={modalFigure.image.split('/').pop()}><Icon name="download" /></a><button
                 type="button"
                 className="figure-modal-close"
                 onClick={() => setModalFigure(null)}
                 aria-label="Close high-resolution figure modal"
               >
-                ✕
-              </button>
+                <Icon name="close" />
+              </button></div>
             </div>
             <div className="figure-modal-image-wrap">
               <img src={asset(modalFigure.image)} alt={modalFigure.title} />
             </div>
             <div className="figure-modal-footer">
               <p className="figure-modal-caption">{modalFigure.caption}</p>
-              <p className="figure-modal-takeaway">
-                <strong>Empirical takeaway:</strong> {modalFigure.takeaway}
-              </p>
-              <div className="figure-modal-actions">
-                <a
-                  className="button compact secondary"
-                  href={asset(modalFigure.image)}
-                  download={modalFigure.image.split("/").pop()}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Download full image ↓
-                </a>
-              </div>
+              <p className="micro">Source-manuscript figure; not independently validated.</p>
+
             </div>
           </div>
-        </div>
+        </dialog>
       )}
     </>
   );

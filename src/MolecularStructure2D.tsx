@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { asset } from './research'
 
 const svgCache = new Map<string, string>()
@@ -39,7 +39,10 @@ function transformSvg(rawSvg: string): string {
     return `<path class="molecule-atom ${cls}" style="--atom-idx: ${idx};"`
   })
 
+  // Keep the whole assembly within one timing budget, even for large structures.
   return cleaned
+    .replace(/--bond-idx: (\d+);/g, (_, index) => `--bond-delay: ${(Number(index) * 80 / Math.max(1, bondIdx - 1)).toFixed(1)}ms;`)
+    .replace(/--atom-idx: (\d+);/g, (_, index) => `--atom-delay: ${(40 + Number(index) * 80 / Math.max(1, atomIdx - 1)).toFixed(1)}ms;`)
 }
 
 type Props = {
@@ -50,25 +53,26 @@ type Props = {
 }
 
 export default function MolecularStructure2D({ structure, name, id, replayCount = 0 }: Props) {
-  const [svgContent, setSvgContent] = useState<string | null>(() => svgCache.get(structure) ?? null)
-  const [isAssembling, setIsAssembling] = useState(true)
-  const timerRef = useRef<number | null>(null)
+  const [loaded, setLoaded] = useState(() => ({ structure, svg: svgCache.get(structure) ?? null }))
+  const [isAssembling, setIsAssembling] = useState(false)
+  const lastReplay = useRef(replayCount)
 
   useEffect(() => {
     let active = true
-    setIsAssembling(true)
+    const replay = lastReplay.current !== replayCount
+    lastReplay.current = replayCount
+    const preference = matchMedia('(prefers-reduced-motion: reduce)')
+    const settle = () => { if (preference.matches) setIsAssembling(false) }
+    preference.addEventListener('change', settle)
+    const show = (svg: string) => {
+      setLoaded({ structure, svg })
+      setIsAssembling(replay && !preference.matches)
+    }
+    const controller = new AbortController()
 
     if (svgCache.has(structure)) {
-      setSvgContent(svgCache.get(structure)!)
-      if (timerRef.current) window.clearTimeout(timerRef.current)
-      timerRef.current = window.setTimeout(() => {
-        if (active) setIsAssembling(false)
-      }, 950)
-      return
-    }
-
-    const controller = new AbortController()
-    fetch(asset(structure), { signal: controller.signal })
+      show(svgCache.get(structure)!)
+    } else fetch(asset(structure), { signal: controller.signal })
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch SVG')
         return res.text()
@@ -77,11 +81,7 @@ export default function MolecularStructure2D({ structure, name, id, replayCount 
         if (!active) return
         const transformed = transformSvg(raw)
         svgCache.set(structure, transformed)
-        setSvgContent(transformed)
-        if (timerRef.current) window.clearTimeout(timerRef.current)
-        timerRef.current = window.setTimeout(() => {
-          if (active) setIsAssembling(false)
-        }, 950)
+        show(transformed)
       })
       .catch(() => {
         // Handled: fallback to img tag on error
@@ -90,11 +90,11 @@ export default function MolecularStructure2D({ structure, name, id, replayCount 
     return () => {
       active = false
       controller.abort()
-      if (timerRef.current) window.clearTimeout(timerRef.current)
+      preference.removeEventListener('change', settle)
     }
   }, [structure, id, replayCount])
 
-  if (!svgContent) {
+  if (loaded.structure !== structure || !loaded.svg) {
     return (
       <img
         className="molecule-image"
@@ -112,7 +112,8 @@ export default function MolecularStructure2D({ structure, name, id, replayCount 
       className={`molecule-2d-canvas ${isAssembling ? 'is-assembling' : ''}`}
       role="img"
       aria-label={`RDKit 2D molecular structure of ${name}`}
-      dangerouslySetInnerHTML={{ __html: svgContent }}
+      onAnimationEnd={event => { if (event.animationName === 'molecule2dEntrance') setIsAssembling(false) }}
+      dangerouslySetInnerHTML={{ __html: loaded.svg }}
     />
   )
 }

@@ -143,7 +143,7 @@ export function createFilm(canvas, geometry, record, width=3840, height=2160) {
     let active=0;
     CHAPTERS.forEach((start,i)=>{if(time>=start)active=i;});
     stages.forEach((group,i)=>{group.visible=i===active;});
-    fadeMaterial.opacity=1-(active===0?1:ease((time-boundaries[active])/.65))*(1-ease((time-boundaries[active+1]+.65)/.65));
+    fadeMaterial.opacity=1-(active===0?1:ease((time-boundaries[active])/.4))*(active===stages.length-1?1:1-ease((time-boundaries[active+1]+.4)/.4));
     const enter=ease(time/2);
     input.position.set(0,mix(.5,0,enter),mix(-3,0,enter));input.scale.setScalar(mix(.6,1,enter));input.rotation.set(-.25+Math.sin(time*.5)*.08,-.3+Math.sin(time*.3)*.25,.18);
     scanner.position.y=mix(-2.2,2.2,(time%4)/4);inputPaths.forEach((r,i)=>{r.pulse.position.copy(r.curve.getPointAt(clamp((time-3.1-i*.18)/1.8)));r.pulse.visible=time>3;});

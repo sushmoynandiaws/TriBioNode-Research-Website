@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react'
+import Icon from './Icon'
+import { useEffect, useState, useRef, useId, useMemo } from 'react'
 import { asset } from './research'
 
 type Geometry = {
@@ -19,15 +20,17 @@ const colors: Record<string, string> = {
 }
 
 export default function ConformerViewer({ path, name }: { path: string | null; name: string }) {
+  const atomGradient = useId()
   const [loaded, setLoaded] = useState<{ path: string; geometry: Geometry } | null>(null)
   const [error, setError] = useState(false)
   const [rotation, setRotation] = useState([0.3, -0.4])
   const [zoom, setZoom] = useState(1)
-  const [drag, setDrag] = useState<number[] | null>(null)
+  const drag = useRef<{ pointer: number; x: number; y: number } | null>(null)
   const [retry, setRetry] = useState(0)
-  const [assemblyProgress, setAssemblyProgress] = useState(1)
   const [assemblyKey, setAssemblyKey] = useState(0)
-  const rafRef = useRef<number | null>(null)
+  const model = useRef<SVGGElement>(null)
+  const animations = useRef<Animation[]>([])
+  const lastReplay = useRef(0)
 
   useEffect(() => {
     if (!path) return
@@ -50,75 +53,56 @@ export default function ConformerViewer({ path, name }: { path: string | null; n
     return () => controller.abort()
   }, [path, retry])
 
-  // Assembly motion from distance
+  function settleAssembly() {
+    animations.current.forEach(animation => animation.cancel())
+    animations.current = []
+  }
+
   useEffect(() => {
-    if (!loaded) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setAssemblyProgress(1)
-      return
+    const replay = lastReplay.current !== assemblyKey
+    lastReplay.current = assemblyKey
+    const root = model.current
+    if (loaded?.path !== path || !root || !replay) return
+    const preference = matchMedia('(prefers-reduced-motion: reduce)')
+    const settleIfNeeded = () => { if (preference.matches || document.hidden) settleAssembly() }
+    if (!preference.matches && !document.hidden) {
+      // Predetermined replay runs outside React; coordinates remain scientifically stable.
+      animations.current = [root.animate([
+        { transform: 'translateY(4px) scale(0.97)', opacity: .3 },
+        { transform: 'translateY(0) scale(1)', opacity: 1 },
+      ], { duration: 280, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' })]
+      root.querySelectorAll<SVGGElement>('.conformer-bonds, .conformer-atoms').forEach((group, index) => {
+        animations.current.push(group.animate([{ opacity: .2 }, { opacity: 1 }], { duration: 180, delay: index * 60, fill: 'backwards', easing: 'ease-out' }))
+      })
     }
-
-    setAssemblyProgress(0)
-    const startTime = performance.now()
-    const duration = 850 // ms
-
-    const step = (now: number) => {
-      const elapsed = now - startTime
-      const t = Math.min(1, elapsed / duration)
-      // Easing curve: smooth deceleration
-      const eased = 1 - Math.pow(1 - t, 3)
-      setAssemblyProgress(eased)
-      if (t < 1) {
-        rafRef.current = requestAnimationFrame(step)
-      } else {
-        setAssemblyProgress(1)
-      }
-    }
-
-    rafRef.current = requestAnimationFrame(step)
+    preference.addEventListener('change', settleIfNeeded)
+    document.addEventListener('visibilitychange', settleIfNeeded)
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      settleAssembly()
+      preference.removeEventListener('change', settleIfNeeded)
+      document.removeEventListener('visibilitychange', settleIfNeeded)
     }
-  }, [loaded?.path, assemblyKey])
+  }, [loaded, path, assemblyKey])
+
+  const centered = useMemo(() => {
+    if (!loaded) return []
+    const center = [0, 1, 2].map(axis => loaded.geometry.atoms.reduce((sum, atom) => sum + atom.position[axis], 0) / loaded.geometry.atoms.length)
+    return loaded.geometry.atoms.map(atom => atom.position.map((value, axis) => value - center[axis]))
+  }, [loaded])
 
   if (!path) return <p className="viewer-loading">A reliable 3D conformer is unavailable for this molecule. Its 2D structure and saved predictions are available.</p>
   if (error) return <div className="viewer-loading" role="alert"><p>The conformer could not be loaded.</p><button className="button compact secondary" onClick={() => setRetry(retry + 1)}>Retry 3D view</button></div>
   if (loaded?.path !== path) return <p className="viewer-loading" role="status">Loading molecular conformer…</p>
 
   const geometry = loaded.geometry
-  const center = [0, 1, 2].map(axis => geometry.atoms.reduce((sum, a) => sum + a.position[axis], 0) / geometry.atoms.length)
-  const centered = geometry.atoms.map(a => a.position.map((v, axis) => v - center[axis]))
   const size = Math.max(...centered.map(a => Math.hypot(...a)), 1)
   const scale = (112 / size) * zoom
 
-  // Project atoms with arrival animation from distance
-  const atomCount = geometry.atoms.length
   const projected = centered.map(([x, y, z], i) => {
-    let curX = x
-    let curY = y
-    let curZ = z
-    let radiusScale = 1
-    let atomOpacity = 1
-
-    if (assemblyProgress < 1) {
-      const stagger = (i / atomCount) * 0.28
-      const p = Math.max(0, Math.min(1, (assemblyProgress - stagger) / (1 - stagger)))
-      const e = 1 - Math.pow(1 - p, 3)
-      // Far in negative z and expanded outward
-      const x0 = x * 1.7 + ((i % 5) - 2) * 16
-      const y0 = y * 1.7 + ((i % 7) - 3) * 16
-      const z0 = z - 280
-      curX = x0 + (x - x0) * e
-      curY = y0 + (y - y0) * e
-      curZ = z0 + (z - z0) * e
-      radiusScale = 0.25 + 0.75 * e
-      atomOpacity = Math.min(1, p * 2.2)
-    }
-
-    const rx = curX * Math.cos(rotation[0]) + curZ * Math.sin(rotation[0])
-    const rz = -curX * Math.sin(rotation[0]) + curZ * Math.cos(rotation[0])
-    const ry = curY * Math.cos(rotation[1]) - rz * Math.sin(rotation[1])
-    const depth = curY * Math.sin(rotation[1]) + rz * Math.cos(rotation[1])
+    const rx = x * Math.cos(rotation[0]) + z * Math.sin(rotation[0])
+    const rz = -x * Math.sin(rotation[0]) + z * Math.cos(rotation[0])
+    const ry = y * Math.cos(rotation[1]) - rz * Math.sin(rotation[1])
+    const depth = y * Math.sin(rotation[1]) + rz * Math.cos(rotation[1])
 
     return {
       x: 280 + rx * scale,
@@ -126,8 +110,6 @@ export default function ConformerViewer({ path, name }: { path: string | null; n
       depth,
       index: i,
       element: geometry.atoms[i].element,
-      radiusScale,
-      opacity: atomOpacity,
     }
   })
 
@@ -147,36 +129,43 @@ export default function ConformerViewer({ path, name }: { path: string | null; n
           }
           if (directions[e.key]) {
             e.preventDefault()
+            settleAssembly()
             setRotation(r => r.map((v, i) => v + directions[e.key][i]))
           }
         }}
         onPointerDown={e => {
-          if (e.button === 0) {
+          if (e.button === 0 && !drag.current) {
+            settleAssembly()
             e.currentTarget.setPointerCapture(e.pointerId)
-            setDrag([e.clientX, e.clientY])
+            drag.current = { pointer: e.pointerId, x: e.clientX, y: e.clientY }
           }
         }}
-        onPointerUp={() => setDrag(null)}
-        onPointerCancel={() => setDrag(null)}
-        onLostPointerCapture={() => setDrag(null)}
+        onPointerUp={e => { if (drag.current?.pointer === e.pointerId) drag.current = null }}
+        onPointerCancel={e => { if (drag.current?.pointer === e.pointerId) drag.current = null }}
+        onLostPointerCapture={e => { if (drag.current?.pointer === e.pointerId) drag.current = null }}
         onPointerMove={e => {
-          if (!drag) return
-          setRotation(r => [r[0] + (e.clientX - drag[0]) * 0.01, r[1] + (e.clientY - drag[1]) * 0.01])
-          setDrag([e.clientX, e.clientY])
+          const previous = drag.current
+          if (previous?.pointer !== e.pointerId) return
+          setRotation(r => [r[0] + (e.clientX - previous.x) * 0.01, r[1] + (e.clientY - previous.y) * 0.01])
+          drag.current = { pointer: e.pointerId, x: e.clientX, y: e.clientY }
         }}
       >
-        {/* Render thick, substantial connected bonds */}
+        <defs>
+          {Object.entries(colors).map(([element, color]) => <radialGradient key={element} id={`${atomGradient}-${element}`} cx="30%" cy="25%" r="80%">
+            <stop offset="0" stopColor="var(--surface)" />
+            <stop offset=".35" stopColor={color} />
+            <stop offset="1" stopColor="var(--text)" />
+          </radialGradient>)}
+        </defs>
+        <g ref={model} className="conformer-model">
+        <g className="conformer-bonds">
         {geometry.bonds.map((bond, i) => {
           const a = projected[bond.start]
           const b = projected[bond.end]
-          const bondOpacity = Math.min(a.opacity, b.opacity)
-          if (bondOpacity <= 0.05) return null
-
-          const baseWidth = bond.order > 2 ? 8.5 : bond.order > 1 ? 7.0 : 4.8
-          const strokeWidth = Math.max(1.5, baseWidth * Math.min(1, bondOpacity * 1.3))
+          const strokeWidth = bond.order > 2 ? 8.5 : bond.order > 1 ? 7.0 : 4.8
 
           return (
-            <g key={i} opacity={bondOpacity}>
+            <g key={i} opacity="1">
               <line
                 x1={a.x}
                 x2={b.x}
@@ -201,16 +190,17 @@ export default function ConformerViewer({ path, name }: { path: string | null; n
           )
         })}
 
-        {/* Render atom spheres sorted by depth */}
+        </g>
+        <g className="conformer-atoms">
         {[...projected]
           .sort((a, b) => a.depth - b.depth)
           .map(a => (
-            <g key={a.index} opacity={a.opacity}>
+            <g key={a.index} opacity="1">
               <circle
                 cx={a.x}
                 cy={a.y}
-                r={(a.element === 'C' ? 8.5 : 11.5) * a.radiusScale}
-                fill={colors[a.element] ?? '#735c96'}
+                r={a.element === 'C' ? 8.5 : 11.5}
+                fill={colors[a.element] ? `url(#${atomGradient}-${a.element})` : '#735c96'}
                 stroke="var(--surface)"
                 strokeWidth="1.8"
               />
@@ -226,6 +216,8 @@ export default function ConformerViewer({ path, name }: { path: string | null; n
               </text>
             </g>
           ))}
+        </g>
+        </g>
       </svg>
       <div className="conformer-controls">
         <span>Drag or use arrow keys to rotate</span>
@@ -238,20 +230,21 @@ export default function ConformerViewer({ path, name }: { path: string | null; n
             max="1.5"
             step="0.05"
             value={zoom}
-            onChange={e => setZoom(Number(e.target.value))}
+            onChange={e => { settleAssembly(); setZoom(Number(e.target.value)) }}
           />
         </label>
         <button
           className="text-button"
           onClick={() => setAssemblyKey(k => k + 1)}
-          title="Replay molecular assembly motion from distance"
+          title="Replay molecular assembly"
           aria-label="Replay molecular assembly"
         >
-          ↺ Assemble
+          <Icon name="replay" /> Replay assembly
         </button>
         <button
           className="text-button"
           onClick={() => {
+            settleAssembly()
             setRotation([0.3, -0.4])
             setZoom(1)
           }}

@@ -22,9 +22,9 @@
   --nav-border: rgba(245, 253, 255, 0.8);
   --nav-selected: rgba(245, 253, 255, 0.65);
   --view1: #2466a2;
-  --view2: #7b4f98;
-  --view3: #94471f;
-  --fused: #076c5c;
+  --view2: #246f68;
+  --view3: #905e22;
+  --fused: #214e7c;
   --font:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
     "Helvetica Neue", sans-serif;
@@ -39,6 +39,10 @@
     0 1px 2px rgba(32, 53, 74, 0.04), 0 8px 24px rgba(32, 53, 74, 0.05);
   --sh-panel:
     0 1px 3px rgba(32, 53, 74, 0.05), 0 14px 40px rgba(32, 53, 74, 0.05);
+  --type-section: clamp(28px, 3vw, 36px);
+  --type-title: clamp(18px, 2vw, 22px);
+  --type-body: 15px;
+  --type-meta: 13px;
   --header-space: 88px;
   --max-grid: 1080px;
   --pad-x: 22px;
@@ -60,6 +64,8 @@
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 110px;
+
+  scrollbar-gutter: stable;
 }
 body {
   margin: 0;
@@ -138,7 +144,7 @@ a svg {
   margin-inline: auto;
 }
 .section {
-  padding-block: clamp(56px, 7vw, 96px);
+  padding-block: clamp(48px, 6vw, 80px);
 }
 .eyebrow,
 .mini-label {
@@ -168,9 +174,9 @@ a svg {
 }
 .subtle,
 .micro {
-  font-size: 12px;
+  font-size: var(--type-meta);
   color: var(--text-2);
-  line-height: 1.7;
+  line-height: 1.65;
 }
 .status-badge {
   display: inline-flex;
@@ -384,22 +390,22 @@ a svg {
   display: grid;
   grid-template-columns: 1.25fr 1fr;
   align-items: end;
-  gap: 72px;
-  margin-bottom: 32px;
+  gap: 32px;
+  margin-bottom: 24px;
 }
 .section-heading h2 {
-  font-size: clamp(30px, 3.6vw, 44px);
+  font-size: var(--type-section);
   font-weight: 600;
-  letter-spacing: -0.045em;
-  line-height: 1.1;
+  letter-spacing: -.035em;
+  line-height: 1.2;
   margin-bottom: 0;
   max-width: 560px;
 }
 .section-intro p {
   margin-bottom: 0;
-  font-size: 16px;
+  font-size: var(--type-body);
   color: var(--text-2);
-  line-height: 1.85;
+  line-height: 1.75;
   max-width: 440px;
 }
 
@@ -559,7 +565,7 @@ a svg {
 .molecule-option.selected .molecule-glyph {
   color: var(--accent-link);
 }
-.molecule-option > span:nth-child(2) {
+.molecule-option > span {
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -568,7 +574,7 @@ a svg {
   font-size: 13px;
   font-weight: 600;
 }
-.molecule-option > span:nth-child(2) > span {
+.molecule-option > span > span {
   font-size: 11px;
   color: var(--text-2);
 }
@@ -587,6 +593,12 @@ a svg {
   text-align: left;
   color: var(--text-body);
   margin-top: auto;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
 }
 .reset-button:hover {
   background: var(--bg);
@@ -670,14 +682,13 @@ a svg {
   background: var(--bg);
   border: 1px solid var(--hairline);
   border-radius: var(--r-pill);
-  transition: all 180ms ease;
+  transition: background-color 180ms var(--ease-out-quart), color 180ms var(--ease-out-quart), border-color 180ms var(--ease-out-quart);
   cursor: pointer;
 }
 .assemble-btn:hover {
   background: var(--nav-selected);
   border-color: rgba(40, 114, 184, 0.3);
   color: var(--accent);
-  transform: translateY(-1px);
 }
 .assemble-btn:active {
   transform: translateY(0);
@@ -711,53 +722,42 @@ a svg {
 }
 .molecule-image {
   width: 100%;
-  height: 240px;
+  height: 260px;
   object-fit: contain;
   mix-blend-mode: multiply;
 }
 
-/* 2D Molecular Structure Animation: Arrival from distance & thicker connected bonds */
+/* A finite assembly reveal; the structure settles before measurement. */
 .molecule-2d-canvas {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 240px;
-  perspective: 1000px;
+  height: 260px;
   overflow: hidden;
-  padding: 10px;
+  padding: 12px;
 }
 .molecule-2d-svg {
   display: block;
   width: 100%;
   height: 100%;
-  max-height: 240px;
+  max-height: 260px;
   object-fit: contain;
   mix-blend-mode: multiply;
-  transform-style: preserve-3d;
-  will-change: transform, opacity;
 }
 .molecule-2d-canvas.is-assembling .molecule-2d-svg {
-  animation: molecule2dEntrance 850ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: molecule2dEntrance 280ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
 @keyframes molecule2dEntrance {
   0% {
-    opacity: 0;
-    transform: perspective(1000px) translateZ(-160px) translateY(18px)
-      rotateX(10deg) scale(0.76);
-    filter: blur(4px);
-  }
-  35% {
-    opacity: 0.95;
-    filter: blur(0);
+    opacity: 0.2;
+    transform: translateY(4px) scale(0.97);
   }
   100% {
     opacity: 1;
-    transform: perspective(1000px) translateZ(0) translateY(0) rotateX(0deg)
-      scale(1);
-    filter: blur(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -767,79 +767,46 @@ a svg {
   stroke-linejoin: round !important;
 }
 .molecule-2d-canvas.is-assembling .molecule-bond {
-  stroke-dasharray: 140;
-  stroke-dashoffset: 140;
-  animation: bondAssembleIn 750ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(var(--bond-idx, 0) * 13ms);
-  transform-origin: center center;
+  animation: bondAssembleIn 180ms var(--ease-out-quart) both;
+  animation-delay: var(--bond-delay, 0ms);
 }
 
 @keyframes bondAssembleIn {
   0% {
     opacity: 0;
-    stroke-dashoffset: 140;
-    transform: scale(0.5);
   }
   45% {
     opacity: 0.9;
   }
   100% {
     opacity: 1;
-    stroke-dashoffset: 0;
-    transform: scale(1);
   }
 }
 
 .molecule-2d-canvas.is-assembling .molecule-atom {
-  animation: atomAssembleIn 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(80ms + var(--atom-idx, 0) * 16ms);
-  transform-origin: center center;
+  animation: atomAssembleIn 140ms var(--ease-out-quart) both;
+  animation-delay: var(--atom-delay, 40ms);
 }
 
 @keyframes atomAssembleIn {
   0% {
     opacity: 0;
-    transform: scale(0.15) translateY(-8px);
-  }
-  65% {
-    opacity: 1;
-    transform: scale(1.18) translateY(0);
   }
   100% {
     opacity: 1;
-    transform: scale(1) translateY(0);
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .molecule-2d-canvas:not(.is-assembling) .molecule-2d-svg {
-    animation: molecule2dFloat 6.5s ease-in-out infinite;
-  }
-}
 
-@keyframes molecule2dFloat {
-  0%,
-  100% {
-    transform: translateY(0px) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-3.5px) rotate(0.4deg);
-  }
-}
+
 
 .conformer-viewer {
   position: relative;
   width: 100%;
 }
-.conformer-viewer svg {
-  display: block;
-  width: 100%;
-  height: 240px;
-  cursor: grab;
-  outline: none;
-}
-.conformer-viewer svg:active {
-  cursor: grabbing;
+.conformer-model {
+  transform-box: fill-box;
+  transform-origin: center;
 }
 .structure-meta {
   display: flex;
@@ -1076,10 +1043,10 @@ i {
   border-left: 1px solid var(--hairline);
 }
 .chart-card h3 {
-  font-size: 20px;
+  font-size: var(--type-title);
   font-weight: 600;
   letter-spacing: -0.025em;
-  line-height: 1.35;
+  line-height: 1.3;
   margin-bottom: 14px;
 }
 .chart-heading {
@@ -1145,7 +1112,6 @@ i {
 .metric-bar-track > div {
   height: 100%;
   border-radius: var(--r-pill);
-  transition: width 0.25s var(--ease-out-quart);
 }
 .metric-bar-row > strong {
   text-align: right;
@@ -1280,7 +1246,6 @@ i {
   display: block;
   height: 100%;
   border-radius: var(--r-pill);
-  transition: width 0.25s var(--ease-out-quart);
 }
 .error-bars strong {
   font-size: 14px;
@@ -1451,11 +1416,11 @@ details[open] summary > span:last-child {
 /* Thesis Empirical Research Figures Panel */
 .thesis-figures-panel {
   margin-top: 36px;
-  padding: 32px;
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-panel);
-  box-shadow: var(--sh-panel);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 .figures-header {
   display: flex;
@@ -1463,39 +1428,27 @@ details[open] summary > span:last-child {
   gap: 18px;
   margin-bottom: 28px;
 }
-.figures-header-badge {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.figures-count-pill {
-  font-size: 11px;
-  font-weight: 550;
-  color: var(--accent-link);
-  background: var(--nav-selected);
-  padding: 3px 10px;
-  border-radius: var(--r-pill);
-}
 .figures-header h3 {
   font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.03em;
   margin: 0 0 6px;
+
+  line-height: 1.3;
 }
 .figures-header p {
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--type-meta);
   margin: 0;
-  max-width: 680px;
+  max-width: 72ch;
 }
 .figure-category-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 4px;
-  background: var(--bg);
-  border-radius: var(--r-pill);
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
   width: fit-content;
 }
 .figure-chip {
@@ -1508,7 +1461,7 @@ details[open] summary > span:last-child {
   color: var(--text-2);
   background: transparent;
   cursor: pointer;
-  transition: all 180ms ease;
+  transition: background-color 180ms var(--ease-out-quart), color 180ms var(--ease-out-quart);
 }
 .figure-chip:hover {
   color: var(--text);
@@ -1521,37 +1474,47 @@ details[open] summary > span:last-child {
 }
 .figures-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px 24px;
 }
 .figure-card {
   display: flex;
   flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-card);
-  overflow: hidden;
-  box-shadow: var(--sh-card);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
   cursor: pointer;
-  transition: transform 220ms var(--ease-spring), box-shadow 220ms ease, border-color 220ms ease;
+  transition: border-color .2s ease;
   outline: none;
+
+  border-bottom: 1px solid var(--hairline);
 }
 .figure-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(32, 53, 74, 0.09);
-  border-color: rgba(40, 114, 184, 0.35);
+  transform: none;
+  box-shadow: none;
+  border-color: var(--accent);
 }
 .figure-card:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(40, 114, 184, 0.25);
+  box-shadow: none;
+
+  outline: 3px solid var(--accent);
+
+  outline-offset: 5px;
 }
 .figure-card-media {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 10;
-  background: #fdfefe;
+  aspect-ratio: 4 / 3;
+  background: #fff;
   border-bottom: 1px solid var(--hairline);
   overflow: hidden;
+
+  border: 1px solid var(--hairline);
+
+  border-radius: var(--r-thumb);
 }
 .figure-card-media img {
   display: block;
@@ -1559,45 +1522,13 @@ details[open] summary > span:last-child {
   height: 100%;
   object-fit: contain;
   padding: 10px;
-  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: none;
 }
 .figure-card:hover .figure-card-media img {
-  transform: scale(1.025);
-}
-.figure-card-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(32, 53, 74, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 200ms ease;
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
-}
-.figure-card:hover .figure-card-overlay {
-  opacity: 1;
-}
-.inspect-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--surface);
-  background: rgba(32, 53, 74, 0.85);
-  border-radius: var(--r-pill);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
-  transform: translateY(6px);
-  transition: transform 200ms var(--ease-spring);
-}
-.figure-card:hover .inspect-pill {
-  transform: translateY(0);
+  transform: none;
 }
 .figure-card-body {
-  padding: 18px 20px 22px;
+  padding: 16px 0 20px;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1605,76 +1536,70 @@ details[open] summary > span:last-child {
 .figure-card-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 10px;
 }
 .figure-badge {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--accent);
-  background: var(--nav-selected);
-  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--text-2);
+  background: transparent;
+  padding: 0;
   border-radius: 4px;
 }
 .figure-tag {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-2);
 }
 .figure-card-body h4 {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
-  line-height: 1.35;
-  margin: 0 0 10px;
-}
-.figure-takeaway {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text-body);
-  margin: 0 0 12px;
-  background: var(--bg);
-  padding: 8px 10px;
-  border-radius: 6px;
-}
-.figure-takeaway strong {
-  color: var(--text);
+  line-height: 1.4;
+  margin: 0 0 8px;
 }
 .figure-caption {
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: var(--type-meta);
+  line-height: 1.65;
   color: var(--text-2);
   margin-top: auto;
+
+  margin: 0;
 }
 .figure-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(16, 29, 43, 0.75);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   display: grid;
   place-items: center;
   padding: 24px;
   overflow-y: auto;
-  animation: modalFadeIn 220ms ease both;
-}
-@keyframes modalFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  animation: none;
+
+  width: 100%;
+
+  height: 100%;
+
+  max-width: none;
+
+  max-height: none;
+
+  margin: 0;
+
+  border: 0;
 }
 .figure-modal-card {
   width: min(1080px, 100%);
-  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   display: flex;
   flex-direction: column;
   background: var(--surface);
   border-radius: var(--r-panel);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
-  overflow: hidden;
-  animation: modalScaleIn 260ms var(--ease-spring) both;
-}
-@keyframes modalScaleIn {
-  from { transform: scale(0.94); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  box-shadow: 0 2px 8px rgba(32,53,74,.1), 0 30px 80px rgba(32,53,74,.24);
+  overflow: auto;
+  animation: none;
 }
 .figure-modal-header {
   display: flex;
@@ -1683,6 +1608,14 @@ details[open] summary > span:last-child {
   gap: 16px;
   padding: 20px 28px;
   border-bottom: 1px solid var(--hairline);
+
+  position: sticky;
+
+  top: 0;
+
+  z-index: 1;
+
+  background: var(--surface);
 }
 .figure-modal-meta {
   display: flex;
@@ -1694,6 +1627,8 @@ details[open] summary > span:last-child {
   font-size: 18px;
   font-weight: 600;
   margin: 0;
+
+  line-height: 1.4;
 }
 .figure-modal-close {
   display: grid;
@@ -1706,28 +1641,36 @@ details[open] summary > span:last-child {
   color: var(--text-2);
   background: var(--bg);
   cursor: pointer;
-  transition: all 180ms ease;
+  transition: background-color 180ms var(--ease-out-quart), color 180ms var(--ease-out-quart);
+
+  flex-shrink: 0;
 }
 .figure-modal-close:hover {
   color: var(--text);
   background: var(--nav-selected);
-  transform: rotate(90deg);
+  transform: none;
 }
 .figure-modal-image-wrap {
   position: relative;
   width: 100%;
-  max-height: min(65vh, 600px);
+  max-height: none;
   background: #fcfdfe;
-  overflow: auto;
+  overflow: visible;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
+
+  flex-shrink: 0;
 }
 .figure-modal-image-wrap img {
   max-width: 100%;
-  max-height: 100%;
+  max-height: min(60dvh, 640px);
   object-fit: contain;
+
+  width: 100%;
+
+  height: auto;
 }
 .figure-modal-footer {
   padding: 20px 28px;
@@ -1736,16 +1679,13 @@ details[open] summary > span:last-child {
   flex-direction: column;
   gap: 10px;
   background: var(--bg);
+
+  flex-shrink: 0;
 }
 .figure-modal-caption {
-  font-size: 12px;
+  font-size: var(--type-meta);
   line-height: 1.55;
   color: var(--text-body);
-  margin: 0;
-}
-.figure-modal-takeaway {
-  font-size: 12px;
-  color: var(--accent-link);
   margin: 0;
 }
 .figure-modal-actions {
@@ -1754,7 +1694,15 @@ details[open] summary > span:last-child {
   margin-top: 6px;
 }
 @media (max-width: 720px) {
-  .thesis-figures-panel { padding: 20px 16px; }
+  .thesis-figures-panel { padding: 0;
+  background: transparent;
+
+  border: 0;
+
+  border-radius: 0;
+
+  box-shadow: none;
+}
   .figures-grid { grid-template-columns: 1fr; }
   .figure-category-chips { width: 100%; }
   .figure-modal-header, .figure-modal-footer { padding: 16px; }
@@ -1818,12 +1766,14 @@ details[open] summary > span:last-child {
 }
 .encoder-symbol {
   height: 60px;
-  display: flex;
+  display: grid;
   align-items: center;
   justify-content: center;
   color: var(--view-color);
   font-size: 34px;
   line-height: 1;
+
+  place-items: center;
 }
 .encoder-row button:first-child .encoder-symbol {
   font-family: var(--mono);
@@ -1872,6 +1822,10 @@ details[open] summary > span:last-child {
   font-size: 22px;
   line-height: 36px;
   color: var(--text-2);
+
+  display: grid;
+
+  place-items: center;
 }
 .fusion-row {
   display: grid;
@@ -2003,14 +1957,14 @@ details[open] summary > span:last-child {
   border-left: 1px solid var(--hairline);
 }
 .research-story h3 {
-  font-size: 30px;
+  font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.04em;
-  line-height: 1.2;
+  line-height: 1.3;
   margin-bottom: 24px;
 }
 .research-story > p:not(.mini-label) {
-  font-size: 16px;
+  font-size: var(--type-body);
   line-height: 1.85;
   color: var(--text-body);
 }
@@ -2042,7 +1996,7 @@ details[open] summary > span:last-child {
   color: var(--text-2);
 }
 .evidence-card h3 {
-  font-size: 23px;
+  font-size: var(--type-title);
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.3;
@@ -2121,12 +2075,12 @@ details[open] summary > span:last-child {
 }
 .resource-link strong {
   display: block;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 550;
 }
 .resource-link small {
   display: block;
-  font-size: 13px;
+  font-size: var(--type-meta);
   line-height: 1.7;
   color: var(--text-2);
   margin-top: 6px;
@@ -2254,10 +2208,11 @@ details[open] summary > span:last-child {
 }
 .conformer-viewer > svg {
   width: 100%;
-  height: 230px;
+  height: 260px;
   display: block;
   cursor: grab;
   touch-action: none;
+  overflow: hidden;
 }
 .conformer-viewer > svg:active {
   cursor: grabbing;
@@ -2349,10 +2304,20 @@ details[open] summary > span:last-child {
   }
   .section-heading h2 {
     max-width: 650px;
-  }
+
+  font-size: var(--type-section);
+
+  line-height: 1.2;
+
+  letter-spacing: -.035em;
+}
   .section-intro p {
     max-width: 650px;
-  }
+
+  font-size: var(--type-body);
+
+  line-height: 1.75;
+}
   .molecule-stage {
     grid-template-columns: 1fr;
   }
@@ -2562,11 +2527,17 @@ details[open] summary > span:last-child {
     margin-bottom: 26px;
   }
   .section-heading h2 {
-    font-size: clamp(30px, 7.8vw, 38px);
-  }
+    font-size: var(--type-section);
+
+  line-height: 1.2;
+
+  letter-spacing: -.035em;
+}
   .section-intro p {
-    font-size: 15px;
-  }
+    font-size: var(--type-body);
+
+  line-height: 1.75;
+}
   .explorer-top {
     flex-direction: column;
     align-items: flex-start;
@@ -2632,7 +2603,7 @@ details[open] summary > span:last-child {
   .molecule-option strong {
     font-size: 12px;
   }
-  .molecule-option > span:nth-child(2) > span {
+  .molecule-option > span > span {
     font-size: 10px;
   }
   .molecule-glyph {
@@ -2724,8 +2695,10 @@ details[open] summary > span:last-child {
     padding: 24px 20px;
   }
   .chart-card h3 {
-    font-size: 20px;
-  }
+    font-size: var(--type-title);
+
+  line-height: 1.3;
+}
   .chart-heading {
     gap: 12px;
   }
@@ -2892,18 +2865,22 @@ details[open] summary > span:last-child {
     padding: 28px 24px;
   }
   .research-story h3 {
-    font-size: 28px;
-  }
+    font-size: 24px;
+
+  line-height: 1.3;
+}
   .research-story > p:not(.mini-label) {
-    font-size: 15px;
+    font-size: var(--type-body);
   }
   .evidence-card {
     border-left: 0;
     border-top: 1px solid var(--hairline);
   }
   .evidence-card h3 {
-    font-size: 23px;
-  }
+    font-size: var(--type-title);
+
+  line-height: 1.3;
+}
   .research-scope > div:last-child {
     padding-left: 20px;
   }
@@ -2973,7 +2950,7 @@ details[open] summary > span:last-child {
     display: none;
   }
   .conformer-viewer > svg {
-    height: 230px;
+    height: 260px;
   }
   .conformer-controls {
     gap: 8px;
@@ -3025,7 +3002,7 @@ details[open] summary > span:last-child {
   .molecule-glyph {
     width: 18px;
   }
-  .molecule-option > span:nth-child(2) > span {
+  .molecule-option > span > span {
     font-size: 9px;
   }
   .option-arrow {
@@ -3039,8 +3016,10 @@ details[open] summary > span:last-child {
     gap: 8px;
   }
   .chart-card h3 {
-    font-size: 18px;
-  }
+    font-size: var(--type-title);
+
+  line-height: 1.3;
+}
   .metric-bar-row > strong {
     font-size: 13px;
   }
@@ -3250,3 +3229,27 @@ details[open] summary > span:last-child {
     max-height: none;
   }
 }
+
+/* Consistent action icons and figure inspection. */
+.ui-icon { display: inline-block; flex: none; vertical-align: middle; }
+.figure-card-meta .ui-icon { margin-left: auto; color: var(--accent-link); }
+.figure-modal-backdrop::backdrop { background: rgba(16, 29, 43, .5); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.footer-main > div > a, .footer-bottom a { gap: 8px; }
+@media (max-width: 720px) {
+  .structure-toolbar { align-items: flex-start; gap: 12px; }
+  .structure-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .assemble-btn { padding-inline: 10px; }
+  .figure-modal-backdrop { padding: 12px; }
+  .figure-modal-card { max-height: calc(100dvh - 24px); }
+}
+
+.prediction-chart-scroll, .parity-chart-scroll { width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: var(--control-border) transparent; }
+.prediction-chart-scroll svg { display: block; width: 100%; min-width: 600px; height: auto; }
+.parity-chart-scroll .parity-plot { min-width: 480px; }
+.chart-scroll-hint { display: none; }
+@media (max-width: 680px) { .chart-scroll-hint { display: block; margin: 8px 0 0; color: var(--text-2); font-size: 12px; } }
+
+.figure-modal-header > div:first-child { min-width: 0; }
+.figure-modal-header .figure-modal-actions { flex: none; align-items: center; gap: 8px; margin: 0; }
+.figure-modal-download { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; color: var(--accent-link); background: var(--bg); }
+.figure-modal-download:hover { background: var(--nav-selected); }

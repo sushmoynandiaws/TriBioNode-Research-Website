@@ -16,3 +16,5 @@ Premium export: render.html → Render premium master exports an Annex-B H.264 m
 For web delivery, encode the master to H.264 with libx264, CRF 17, medium preset, yuv420p and faststart. Preserve the native dimensions and verify 1320 frames / 44 seconds. Compare SSIM against the source master before replacing site assets.
 
 Spacing validation: use Check spacing in each orientation. It evaluates all 1320 frames, checking protected ink bounds for label/label and label/object collisions, clipping, mesh opacity, and chapter ownership. The premium exporter repeats the checks at every encoded frame and rejects an invalid composition. Token glyphs inside token tiles are intentional and excluded from protected captions.
+
+Motion refinement: chapter fades use 0.4 seconds each side, with no fade-out on the final chapter. Website playback runs once and holds the saved prediction; replay remains explicit. Short 2D/3D explorer reveals run only on request, so comparing molecules stays immediate.
