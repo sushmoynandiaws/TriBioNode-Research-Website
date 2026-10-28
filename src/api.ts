@@ -47,6 +47,10 @@ export function getApiBaseUrl(): string {
   if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
     return envUrl.trim().replace(/\/+$/, '')
   }
+  // When deployed on Vercel as multiple services, /api routes to the backend service
+  if (typeof window !== 'undefined' && window.location.hostname && window.location.hostname.endsWith('vercel.app')) {
+    return '/api'
+  }
   // Default to the live AWS API Gateway endpoint
   return 'https://2dade5jl50.execute-api.us-east-1.amazonaws.com'
 }

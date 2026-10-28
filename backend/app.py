@@ -185,6 +185,8 @@ def startup_event():
     logger.info("TriBioNode API started and listening on port 8000.")
 
 @app.get("/")
+@app.get("/api")
+@app.get("/api/")
 def root():
     return {
         "status": "online",
@@ -275,6 +277,7 @@ def generate_3d_conformer(mol) -> Optional[Dict[str, Any]]:
 
 
 @app.get("/health")
+@app.get("/api/health")
 def health(load: bool = False):
     if load:
         ensure_model_loaded()
@@ -291,6 +294,7 @@ def health(load: bool = False):
 
 
 @app.post("/predict", response_model=PredictResponse)
+@app.post("/api/predict", response_model=PredictResponse)
 def predict(request: PredictRequest):
     ensure_model_loaded()
     smiles_clean = request.smiles.strip()
