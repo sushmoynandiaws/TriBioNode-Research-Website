@@ -454,8 +454,26 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
 
   return <section id="explorer" className="section wrap">
     <SectionHeading title="Molecular predictions">
-      <p>Compare experimental solubility with predictions from each molecular view or run live model inference.</p>
+      <p>Compare experimental solubility with predictions from each molecular view or run real-time model inference.</p>
     </SectionHeading>
+
+    <div className="explorer-guide" aria-label="Quick guide">
+      <div className="guide-step">
+        <span className="mini-label">01 · Saved Atlas</span>
+        <strong>Explore 113 ESOL molecules</strong>
+        <p>Search by SMILES or ID to inspect 2D/3D structures, predictions, and view-level errors.</p>
+      </div>
+      <div className="guide-step">
+        <span className="mini-label">02 · Real-Time Inference</span>
+        <strong>Predict any custom SMILES</strong>
+        <p>Switch to Real-Time Model Inference to run live multi-view solubility predictions.</p>
+      </div>
+      <div className="guide-step">
+        <span className="mini-label">03 · Benchmarks &amp; Views</span>
+        <strong>Verify 16-dataset results</strong>
+        <p>Scroll to Results and Architecture to inspect cross-domain metrics and 1D/2D/3D gating.</p>
+      </div>
+    </div>
 
     <div className="explorer-top">
       <div className="explorer-mode-switch" role="tablist" aria-label="Prediction mode selection">
@@ -474,7 +492,7 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
             if (!liveResult && !liveLoading) void runLiveInference(undefined, 'Aspirin')
           }}
         >
-          <Icon name="sparkles" size={16} /> Live AWS Model Inference
+          <Icon name="sparkles" size={16} /> Real-Time Model Inference
         </button>
       </div>
 
@@ -483,7 +501,7 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
           <span className="subtle">Saved predictions · 113 benchmark molecules</span>
         ) : (
           <span className={`live-backend-badge ${backendHealth?.healthy ? 'connected' : 'fallback'}`}>
-            <i /> {backendHealth?.healthy ? (backendHealth.s3Bucket ? `AWS S3: ${backendHealth.s3Bucket}` : 'AWS Backend Ready') : 'Multi-View Fallback Engine'}
+            <i /> {backendHealth?.healthy ? (backendHealth.s3Bucket ? `Real-Time Engine · ${backendHealth.s3Bucket}` : 'Real-Time Backend Ready') : 'Multi-View Fallback Engine'}
           </span>
         )}
       </div>
@@ -664,7 +682,7 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
             <>
               <div className="live-source-banner">
                 <span>Model Engine: <strong>{liveResult.modelSource}</strong></span>
-                {liveResult.isFallback && <span>(Set <code>VITE_API_ENDPOINT</code> in <code>.env</code> to connect live AWS endpoint)</span>}
+                {liveResult.isFallback && <span>(Set <code>VITE_API_ENDPOINT</code> in <code>.env</code> to connect real-time endpoint)</span>}
               </div>
 
               <div className="molecule-heading">

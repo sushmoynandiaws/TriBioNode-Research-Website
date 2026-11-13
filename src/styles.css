@@ -414,6 +414,32 @@ a svg {
   max-width: 440px;
 }
 
+.explorer-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.guide-step {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.guide-step strong {
+  font-size: 14px;
+  color: var(--text);
+}
+.guide-step p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
 .explorer-top {
   display: flex;
   flex-wrap: wrap;
@@ -2614,7 +2640,33 @@ details[open] summary > span:last-child {
 
   line-height: 1.75;
 }
-  .explorer-top {
+  .explorer-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.guide-step {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.guide-step strong {
+  font-size: 14px;
+  color: var(--text);
+}
+.guide-step p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+.explorer-top {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
@@ -3312,6 +3364,7 @@ details[open] summary > span:last-child {
 .figure-modal-backdrop::backdrop { background: rgba(4, 10, 20, 0.72); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .footer-main > div > a, .footer-bottom a { gap: 8px; }
 @media (max-width: 720px) {
+  .explorer-guide { grid-template-columns: 1fr; }
   .explorer-top .subtle { text-align: left; }
   .explorer-mode-switch { width: 100%; border-radius: var(--r-card); }
   .explorer-mode-switch button { flex: 1 1 180px; justify-content: center; }
