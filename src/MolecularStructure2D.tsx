@@ -10,6 +10,9 @@ function transformSvg(rawSvg: string): string {
     .replace(/<!DOCTYPE[^>]*>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
     .trim()
+    // RDKit black ink / pure blue nitrogen are unreadable on the dark theme.
+    .replace(/#000000/gi, 'var(--text)')
+    .replace(/#0000FF/gi, 'var(--view1)')
 
   // Ensure svg has proper classes and preserve aspect ratio
   cleaned = cleaned.replace(/<svg\b([^>]*)>/i, (_match, attrs) => {

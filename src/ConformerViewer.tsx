@@ -9,14 +9,14 @@ export type Geometry = {
 }
 
 const colors: Record<string, string> = {
-  C: '#334e60',
-  N: '#2872b8',
-  O: '#c54e41',
-  S: '#a77c13',
-  Cl: '#37824b',
-  F: '#37824b',
-  Br: '#a64e30',
-  P: '#a96520',
+  C: '#9fb3c8',
+  N: '#4f9be0',
+  O: '#e8695c',
+  S: '#e0b43a',
+  Cl: '#4fbf6a',
+  F: '#4fbf6a',
+  Br: '#d0744f',
+  P: '#e08a3a',
 }
 
 export default function ConformerViewer({ path, directGeometry, name }: { path?: string | null; directGeometry?: Geometry | null; name: string }) {
