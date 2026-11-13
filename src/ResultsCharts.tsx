@@ -828,7 +828,7 @@ function BenchmarkSuite() {
       </div>
 
       {activeTab === 'classification' && (
-        <div className="benchmark-table-container">
+        <div className="benchmark-table-container" tabIndex={0} role="region" aria-label="Comparative Classification Performance on MoleculeNet table">
           <table className="benchmark-table" aria-label="Comparative Classification Performance on MoleculeNet">
             <thead>
               <tr>
@@ -866,7 +866,7 @@ function BenchmarkSuite() {
       )}
 
       {activeTab === 'regression' && (
-        <div className="benchmark-table-container">
+        <div className="benchmark-table-container" tabIndex={0} role="region" aria-label="Comparative Regression Performance on MoleculeNet table">
           <table className="benchmark-table" aria-label="Comparative Regression Performance on MoleculeNet">
             <thead>
               <tr>
@@ -900,7 +900,7 @@ function BenchmarkSuite() {
       )}
 
       {activeTab === 'admet' && (
-        <div className="benchmark-table-container">
+        <div className="benchmark-table-container" tabIndex={0} role="region" aria-label="Extended Evaluation on Therapeutics Data Commons ADMET table">
           <table className="benchmark-table" aria-label="Extended Evaluation on Therapeutics Data Commons ADMET">
             <thead>
               <tr>
@@ -934,7 +934,7 @@ function BenchmarkSuite() {
       )}
 
       {activeTab === 'portfolio' && (
-        <div className="benchmark-table-container">
+        <div className="benchmark-table-container" tabIndex={0} role="region" aria-label="16 Benchmark Datasets Catalog table">
           <table className="benchmark-table" aria-label="16 Benchmark Datasets Catalog">
             <thead>
               <tr>

@@ -462,7 +462,6 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
         <button
           role="tab"
           aria-selected={tab === 'atlas'}
-          aria-pressed={tab === 'atlas'}
           onClick={() => setTab('atlas')}
         >
           <Icon name="molecule" size={16} /> Saved Atlas (113 ESOL)
@@ -470,7 +469,6 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
         <button
           role="tab"
           aria-selected={tab === 'live'}
-          aria-pressed={tab === 'live'}
           onClick={() => {
             setTab('live')
             if (!liveResult && !liveLoading) void runLiveInference(undefined, 'Aspirin')
@@ -513,19 +511,23 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
           {!molecule ? (
             <div className="empty-state">
               <Icon name="molecule" size={32} />
-              <h3>Not in saved evaluation</h3>
+              <h3>Not present in this evaluation</h3>
               <p>"{query}" is not among the 113 Delaney ESOL benchmark molecules.</p>
-              <button
-                className="button primary"
-                style={{ marginTop: 12 }}
-                onClick={() => {
-                  setLiveSmiles(query)
-                  setTab('live')
-                  void runLiveInference(query)
-                }}
-              >
-                <Icon name="sparkles" size={16} /> Predict with Live Model <Arrow />
-              </button>
+              <div className="empty-state-actions">
+                <button
+                  className="button primary"
+                  onClick={() => {
+                    setLiveSmiles(query)
+                    setTab('live')
+                    void runLiveInference(query)
+                  }}
+                >
+                  <Icon name="sparkles" size={16} /> Predict with Live Model <Arrow />
+                </button>
+                <button className="button secondary" onClick={reset}>
+                  Return to an example
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -638,7 +640,19 @@ function MoleculeExplorer({ onSelected }: { onSelected: (record: Molecule) => vo
         </aside>
 
         <div className="explorer-detail" role="region" aria-label="Live inference results">
-          {liveError && <div className="live-error-box" role="alert">{liveError}</div>}
+          {liveError && (
+            <div className="live-error-box" role="alert">
+              <span>{liveError}</span>
+              <button
+                type="button"
+                className="button compact secondary"
+                onClick={() => void runLiveInference()}
+                disabled={liveLoading || !liveSmiles.trim()}
+              >
+                <Icon name="replay" size={14} /> Retry
+              </button>
+            </div>
+          )}
 
           {liveLoading ? (
             <div className="empty-live-state">
